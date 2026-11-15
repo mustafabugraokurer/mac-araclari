@@ -1,0 +1,17 @@
+# Python ve derleme çıktıları
+.venv/
+build/
+dist/
+__pycache__/
+*.pyc
+*.icns
+*.iconset/
+
+# Yerel kayıtlar (kullanıcı adı ve klasör yolları içerir)
+*.log
+
+# Geliştirme sırasında kalan dosyalar
+patch_*.py
+_yeni/
+deneme.txt
+.DS_Store
