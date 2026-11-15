@@ -18,7 +18,7 @@ OPTIONS = {
         "CFBundleVersion": "1.1",
         "LSUIElement": True,          # Dock'ta görünmez, sadece menü çubuğu
         "LSMinimumSystemVersion": "12.0",
-        "NSHumanReadableCopyright": "© 2026 Buğra Okurer · MIT",
+        "NSHumanReadableCopyright": "© 2026 Mustafa Buğra Okurer · MIT",
     },
     "packages": ["rumps"],
     "includes": ["UserNotifications"],

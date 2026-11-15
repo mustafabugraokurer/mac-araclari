@@ -13,7 +13,7 @@ OPTIONS = {
         "CFBundleVersion": "1.0",
         "LSUIElement": True,
         "LSMinimumSystemVersion": "12.0",
-        "NSHumanReadableCopyright": "© 2026 Buğra Okurer · MIT",
+        "NSHumanReadableCopyright": "© 2026 Mustafa Buğra Okurer · MIT",
     },
     "includes": ["store", "panel"],
     "packages": ["quickmachotkey"],

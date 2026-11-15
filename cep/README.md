@@ -2,6 +2,16 @@
 
 Menü çubuğunda pano ikonu durur.
 
+<p align="center">
+  <img src="../docs/cep-panel.png" width="49%" alt="Panel">
+  <img src="../docs/cep-hizli-yapistir.png" width="49%" alt="Hızlı yapıştır">
+</p>
+<p align="center">
+  <img src="../docs/cep-tasima-birak.png" width="49%" alt="Taşıma alanına bırak">
+  <img src="../docs/cep-tasima-al.png" width="49%" alt="Taşıma alanından al">
+</p>
+<p align="center"><sub>Tasarım görselleri — gerçek uygulamada küçük farklar olabilir.</sub></p>
+
 ## Panel
 
 Menü çubuğundaki pano ikonuna **tıkla** → panel açılır. **Sağ tık** → ayarlar.

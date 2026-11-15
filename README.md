@@ -10,6 +10,13 @@ kütüphaneleriyle (PyObjC) yazıldı; her biri tek komutla `.app` olarak kurulu
 | **[Hareket](hareket/)** | Uzun süre oturunca kalkmanı hatırlatır. Süre dolunca ekranda uyarı açılır: *Kalktım* deyince mola başlar, istersen ertelersin. |
 | **[Cep](cep/)** | Kopyalama geçmişi ve taşıma alanı. Kopyaladıklarını arar, sabitler, silersin; dosyaları menü çubuğundaki ikona sürükleyip istediğin klasöre taşırsın. |
 
+
+<p align="center">
+  <img src="docs/hareket-menu.png" width="49%" alt="Hareket menüsü">
+  <img src="docs/cep-panel.png" width="49%" alt="Cep paneli">
+</p>
+<p align="center"><sub>Tasarım görselleri — gerçek uygulamada küçük farklar olabilir.</sub></p>
+
 ## Kurulum
 
 ```bash

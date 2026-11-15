@@ -12,6 +12,13 @@ sayaç başlamaz. "Bugün X kez kalktın" sayısı sadece "Kalktım" deyince art
 Bilgisayarı birkaç dakika kullanmazsan (doğal mola) sayaç sessizce sıfırlanır.
 Mac uyuyup uyanınca da sıfırlanır.
 
+<p align="center">
+  <img src="../docs/hareket-menu.png" width="49%" alt="Menü">
+  <img src="../docs/hareket-koyu.png" width="49%" alt="Koyu mod">
+</p>
+<p align="center"><img src="../docs/hareket-durumlar.png" width="70%" alt="Menü çubuğu durumları"></p>
+<p align="center"><sub>Tasarım görselleri — gerçek uygulamada küçük farklar olabilir.</sub></p>
+
 ## Kurulum
 
 `Kur.command` dosyasına çift tıkla ya da klasörde Terminal'den:
