@@ -9,13 +9,13 @@ OPTIONS = {
         "CFBundleName": "Cep",
         "CFBundleDisplayName": "Cep",
         "CFBundleIdentifier": "com.bugra.cep",
-        "CFBundleShortVersionString": "1.0",
-        "CFBundleVersion": "1.0",
+        "CFBundleShortVersionString": "1.1",
+        "CFBundleVersion": "1.1",
         "LSUIElement": True,
         "LSMinimumSystemVersion": "12.0",
         "NSHumanReadableCopyright": "© 2026 Mustafa Buğra Okurer · MIT",
     },
-    "includes": ["store", "panel"],
+    "includes": ["store", "panel", "Vision"],
     "packages": ["quickmachotkey"],
 }
 if os.path.exists("Cep.icns"):

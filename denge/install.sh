@@ -1,14 +1,14 @@
 #!/bin/bash
-# Hareket'i kurar: uygulamayı derler, ~/Applications'a koyar,
+# Denge'yi kurar: uygulamayı derler, ~/Applications'a koyar,
 # oturum açınca başlatır ve çökerse yeniden açar.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP_NAME="Hareket"
-LABEL="com.bugra.hareket"
+APP_NAME="Denge"
+LABEL="com.bugra.denge"
 APP_DIR="$HOME/Applications"
 AGENT="$HOME/Library/LaunchAgents/$LABEL.plist"
-LOG="$HOME/Library/Logs/Hareket.log"
+LOG="$HOME/Library/Logs/Denge.log"
 UID_NUM="$(id -u)"
 
 echo "→ Python ortamı hazırlanıyor"
@@ -17,19 +17,19 @@ PY="${PYTHON:-python3}"
 .venv/bin/pip install -q --upgrade pip
 .venv/bin/pip install -q -r requirements.txt
 
-if [ -f icon_1024.png ] && [ ! -f Hareket.icns ]; then
+if [ -f icon_1024.png ] && [ ! -f Denge.icns ]; then
   echo "→ Uygulama ikonu oluşturuluyor"
-  rm -rf Hareket.iconset && mkdir Hareket.iconset
+  rm -rf Denge.iconset && mkdir Denge.iconset
   for s in 16 32 64 128 256 512; do
-    sips -z $s $s icon_1024.png --out "Hareket.iconset/icon_${s}x${s}.png" >/dev/null
+    sips -z $s $s icon_1024.png --out "Denge.iconset/icon_${s}x${s}.png" >/dev/null
     d=$((s * 2))
-    sips -z $d $d icon_1024.png --out "Hareket.iconset/icon_${s}x${s}@2x.png" >/dev/null
+    sips -z $d $d icon_1024.png --out "Denge.iconset/icon_${s}x${s}@2x.png" >/dev/null
   done
-  iconutil -c icns Hareket.iconset -o Hareket.icns
-  rm -rf Hareket.iconset
+  iconutil -c icns Denge.iconset -o Denge.icns
+  rm -rf Denge.iconset
 fi
 
-echo "→ Hareket.app derleniyor"
+echo "→ Denge.app derleniyor"
 rm -rf build dist
 .venv/bin/python setup.py py2app >/dev/null
 
@@ -37,6 +37,19 @@ echo "→ Çalışan sürüm kapatılıyor"
 launchctl bootout "gui/$UID_NUM/$LABEL" 2>/dev/null || true
 pkill -f "$APP_NAME.app/Contents/MacOS/$APP_NAME" 2>/dev/null || true
 sleep 1
+
+# Eski Hareket uygulaması Denge'nin içine taşındı: varsa durdur ve kaldır.
+OLD_LABEL="com.bugra.hareket"
+if [ -f "$HOME/Library/LaunchAgents/$OLD_LABEL.plist" ] || [ -d "$APP_DIR/Hareket.app" ]; then
+  echo "→ Eski Hareket uygulaması kaldırılıyor (ayarları Denge'ye aktarılacak)"
+  launchctl bootout "gui/$UID_NUM/$OLD_LABEL" 2>/dev/null || true
+  pkill -f "Hareket.app/Contents/MacOS/Hareket" 2>/dev/null || true
+  rm -f "$HOME/Library/LaunchAgents/$OLD_LABEL.plist"
+  if [ -d "$APP_DIR/Hareket.app" ]; then
+    mkdir -p "$HOME/.Trash"
+    mv "$APP_DIR/Hareket.app" "$HOME/.Trash/Hareket-$(date +%Y%m%d%H%M%S).app"
+  fi
+fi
 
 echo "→ ~/Applications klasörüne kopyalanıyor"
 mkdir -p "$APP_DIR"
@@ -66,6 +79,6 @@ PLIST
 launchctl bootstrap "gui/$UID_NUM" "$AGENT"
 
 echo ""
-echo "✓ Hareket kuruldu ve çalışıyor. Menü çubuğuna bak."
+echo "✓ Denge kuruldu ve çalışıyor. Menü çubuğuna bak."
 echo "  İlk bildirimde izin isterse 'İzin Ver' de."
 echo "  Kaldırmak için: ./uninstall.sh"

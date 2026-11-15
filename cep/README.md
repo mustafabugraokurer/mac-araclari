@@ -10,6 +10,7 @@ Menü çubuğunda pano ikonu durur.
   <img src="../docs/cep-tasima-birak.png" width="49%" alt="Taşıma alanına bırak">
   <img src="../docs/cep-tasima-al.png" width="49%" alt="Taşıma alanından al">
 </p>
+<p align="center"><img src="../docs/cep-gorsel-yazi.png" width="70%" alt="Görseldeki yazıyı kopyala"></p>
 <p align="center"><sub>Tasarım görselleri — gerçek uygulamada küçük farklar olabilir.</sub></p>
 
 ## Panel
@@ -31,6 +32,18 @@ Menü çubuğundaki pano ikonuna **tıkla** → panel açılır. **Sağ tık** �
 
 Panel farenin olduğu yerde açılır. ↑↓ ve ↩ ya da ⌘1–9 ile seç, yapıştırılsın.
 (⌘⇧V birçok uygulamada "biçimsiz yapıştır" olarak kullanıldığı için ⌃⌘V seçildi.)
+
+## Görseldeki yazı
+
+- **Kopyaladığın görsellerdeki yazı kendiliğinden tanınır** ve geçmişe metin olarak da
+  eklenir ("Görselden" etiketiyle). Görsel de geçmişte kalır; aramada görselin içindeki
+  yazıyla da bulunur. Ayarlardan "Görsellerdeki yazıyı da kaydet" ile kapatılabilir.
+- **⌃⌘T (Control + Command + T):** ekranda bir alan seç, içindeki yazı doğrudan panoya
+  kopyalanır. Klavyendeki ekran görüntüsü tuşuyla panoya aldığın görüntüler de
+  ilk maddedeki gibi yazıya çevrilir.
+- macOS'un yerleşik metin tanıması (Vision) kullanılır; hiçbir şey internete gitmez.
+- ⌃⌘T ilk kullanımda **Ekran Kaydı** izni ister: Sistem Ayarları → Gizlilik ve Güvenlik →
+  Ekran ve Sistem Sesi Kaydı → Cep.
 
 ## Taşıma alanı
 

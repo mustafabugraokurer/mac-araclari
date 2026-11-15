@@ -1,0 +1,5 @@
+rumps>=0.4.0
+pyobjc-framework-Cocoa
+pyobjc-framework-Quartz
+pyobjc-framework-UserNotifications
+py2app

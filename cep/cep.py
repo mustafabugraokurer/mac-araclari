@@ -6,6 +6,9 @@ Menü çubuğu:
     Tıkla → kopyala (ve istersen yapıştır) · ⌥ tıkla → sil · ⇧ tıkla → sabitle
 Hızlı yapıştır:
     ⌃⌘V → geçmiş imlecin yanında açılır, 1–9 ile seç
+Görseldeki yazı:
+    Kopyalanan görsellerdeki yazı otomatik tanınır, geçmişe metin olarak da eklenir.
+    ⌃⌘T → ekranda bir alan seç, içindeki yazı panoya kopyalanır.
 Taşıma alanı:
     Dosyaları ekranın sağ kenarına sürükle → açılır.
     Üst alana bırak = kes (taşı) · alt alana ya da ⌥ ile bırak = kopyala
@@ -15,6 +18,7 @@ import os
 import plistlib
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -67,7 +71,7 @@ def log(msg):
 
 def ayar_oku():
     import json
-    d = {"yapistir": True, "duraklat": False}
+    d = {"yapistir": True, "duraklat": False, "ocr": True}
     try:
         d.update(json.loads(AYAR_FILE.read_text(encoding="utf-8")))
     except Exception:
@@ -156,6 +160,51 @@ def ax_guvenilir(sor=False):
     except Exception as e:
         log(f"AX kontrolü yapılamadı: {e}")
         return False
+
+
+def metin_tani(png: bytes) -> str:
+    """Görseldeki yazıyı macOS'un yerleşik metin tanımasıyla (Vision) çıkar."""
+    with objc.autorelease_pool():
+        import Vision
+        from Foundation import NSData
+        data = NSData.dataWithBytes_length_(png, len(png))
+        handler = Vision.VNImageRequestHandler.alloc().initWithData_options_(data, None)
+        req = Vision.VNRecognizeTextRequest.alloc().init()
+        req.setRecognitionLevel_(0)            # 0: doğru (yavaş ama iyi)
+        req.setUsesLanguageCorrection_(True)
+        try:
+            destek, _ = req.supportedRecognitionLanguagesAndReturnError_(None)
+            destek = [str(x) for x in (destek or [])]
+            diller = [d for d in ("tr-TR", "en-US") if d in destek]
+            if diller:
+                req.setRecognitionLanguages_(diller)
+        except Exception:
+            pass
+        try:
+            req.setAutomaticallyDetectsLanguage_(True)
+        except Exception:
+            pass
+        ok, err = handler.performRequests_error_([req], None)
+        if not ok:
+            raise RuntimeError(str(err))
+        satirlar = []
+        for o in req.results() or []:
+            aday = o.topCandidates_(1)
+            if not aday:
+                continue
+            b = o.boundingBox()
+            satirlar.append((-round((b.origin.y + b.size.height / 2) * 60), b.origin.x,
+                             str(aday[0].string())))
+        satirlar.sort()
+        return "\n".join(t for _, _, t in satirlar).strip()
+
+
+def bildir(baslik, metin):
+    try:
+        b, m = baslik.replace('"', "'"), metin.replace('"', "'")
+        subprocess.Popen(["osascript", "-e", f'display notification "{m}" with title "{b}"'])
+    except Exception:
+        pass
 
 
 def cmd_v():
@@ -508,6 +557,7 @@ class CepApp(NSObject):
         self.edges = []
         self._ax_soruldu = False
         self._hizli = False
+        self._ekran_calisiyor = False
         self.panel = None
         return self
 
@@ -587,9 +637,11 @@ class CepApp(NSObject):
             if data:
                 rep = NSBitmapImageRep.imageRepWithData_(data)
                 if rep is not None:
-                    png = rep.representationUsingType_properties_(4, {})
-                    self.store.add_image(bytes(png), int(rep.pixelsWide()),
-                                         int(rep.pixelsHigh()), app)
+                    png = bytes(rep.representationUsingType_properties_(4, {}))
+                    item = self.store.add_image(png, int(rep.pixelsWide()),
+                                                int(rep.pixelsHigh()), app)
+                    if item and self.ayar.get("ocr", True) and "ocr" not in item:
+                        self._ocr_baslat(item["id"], png, app)
                     return
         s = self.pb.stringForType_(T_STRING)
         if s:
@@ -611,6 +663,91 @@ class CepApp(NSObject):
         self.own_cc = pb.changeCount()
         self.last_cc = self.own_cc
         self.store.mark_used(item["id"])
+
+    # ---- görseldeki yazı
+    @objc.python_method
+    def _ocr_baslat(self, item_id, png, app):
+        def is_():
+            try:
+                metin = metin_tani(png)
+            except Exception as e:
+                log(f"yazı tanınamadı: {e}")
+                metin = ""
+            AppHelper.callAfter(self._ocr_bitti, item_id, metin, app)
+        threading.Thread(target=is_, daemon=True).start()
+
+    @objc.python_method
+    def _ocr_bitti(self, item_id, metin, app):
+        try:
+            self.store.set_ocr(item_id, metin)
+            if len(metin.strip()) >= 2:
+                self.store.add_text(metin, app, gorselden=True)
+                log(f"görselden yazı alındı: {len(metin.splitlines())} satır")
+            if self.panel is not None and self.panel.acik():
+                self.panel.yenile()
+        except Exception as e:
+            log(f"görsel yazısı eklenemedi: {e}")
+
+    @objc.python_method
+    def ekran_metni(self):
+        """⌃⌘T: ekranda alan seç → içindeki yazı panoya."""
+        if self._ekran_calisiyor:
+            return
+        self._ekran_calisiyor = True
+        yol = DATA_DIR / "ekran_secimi.png"
+
+        def is_():
+            metin, hata = "", None
+            try:
+                if yol.exists():
+                    yol.unlink()
+                subprocess.run(["/usr/sbin/screencapture", "-i", "-x", str(yol)],
+                               timeout=120)
+                if yol.exists():
+                    metin = metin_tani(yol.read_bytes())
+                    yol.unlink()
+                else:
+                    hata = "iptal"
+            except Exception as e:
+                hata = str(e)
+            AppHelper.callAfter(self._ekran_metni_bitti, metin, hata)
+        threading.Thread(target=is_, daemon=True).start()
+
+    @objc.python_method
+    def _ekran_metni_bitti(self, metin, hata):
+        self._ekran_calisiyor = False
+        if hata == "iptal":
+            return
+        if hata:
+            log(f"ekrandan yazı alınamadı: {hata}")
+            bildir("Cep", "Ekrandan yazı alınamadı.")
+            return
+        if len(metin.strip()) < 2:
+            bildir("Cep", "Seçilen alanda yazı bulunamadı.")
+            return
+        try:
+            app = NSWorkspace.sharedWorkspace().frontmostApplication().localizedName() or ""
+        except Exception:
+            app = ""
+        item = self.store.add_text(metin, app, gorselden=True)
+        if item:
+            self._panoya_yaz(item)
+        n = len([x for x in metin.splitlines() if x.strip()])
+        bildir("Cep", f"{n} satır kopyalandı.")
+        log(f"ekrandan yazı kopyalandı: {n} satır")
+        if self.panel is not None and self.panel.acik():
+            self.panel.yenile()
+
+    def ekranTimer_(self, timer):
+        self.ekran_metni()
+
+    def ekranMenu_(self, sender):
+        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            0.3, self, "ekranTimer:", None, False)
+
+    def toggleOcr_(self, sender):
+        self.ayar["ocr"] = not self.ayar.get("ocr", True)
+        ayar_yaz(self.ayar)
 
     # ---- menü
     def menuNeedsUpdate_(self, menu):
@@ -726,6 +863,12 @@ class CepApp(NSObject):
         yap = self._mi("Seçince yapıştır", "togglePaste:")
         yap.setState_(1 if self.ayar["yapistir"] else 0)
         menu.addItem_(yap)
+        ocr = self._mi("Görsellerdeki yazıyı da kaydet", "toggleOcr:")
+        ocr.setState_(1 if self.ayar.get("ocr", True) else 0)
+        menu.addItem_(ocr)
+        ek = self._mi("Ekrandan metin seç", "ekranMenu:", "t", MOD_CMD | (1 << 18))
+        ek.setImage_(sembol("text.viewfinder", 15))
+        menu.addItem_(ek)
         dur = self._mi("Kaydı duraklat", "togglePause:")
         dur.setState_(1 if self.ayar["duraklat"] else 0)
         menu.addItem_(dur)
@@ -860,6 +1003,12 @@ class CepApp(NSObject):
         yap = self._mi("Seçince yapıştır", "togglePaste:")
         yap.setState_(1 if self.ayar["yapistir"] else 0)
         menu.addItem_(yap)
+        ocr = self._mi("Görsellerdeki yazıyı da kaydet", "toggleOcr:")
+        ocr.setState_(1 if self.ayar.get("ocr", True) else 0)
+        menu.addItem_(ocr)
+        ek = self._mi("Ekrandan metin seç", "ekranMenu:", "t", MOD_CMD | (1 << 18))
+        ek.setImage_(sembol("text.viewfinder", 15))
+        menu.addItem_(ek)
         dur = self._mi("Kaydı duraklat", "togglePause:")
         dur.setState_(1 if self.ayar["duraklat"] else 0)
         menu.addItem_(dur)
@@ -931,11 +1080,17 @@ class CepApp(NSObject):
             from quickmachotkey import mask, quickHotKey
             from quickmachotkey.constants import cmdKey, controlKey, kVK_ANSI_V
 
+            from quickmachotkey.constants import kVK_ANSI_T
+
             @quickHotKey(virtualKey=kVK_ANSI_V, modifierMask=mask(cmdKey, controlKey))
             def _hizli():
                 self.hizli_ac()
-            self._hotkey = _hizli
-            log("⌃⌘V kısayolu hazır")
+
+            @quickHotKey(virtualKey=kVK_ANSI_T, modifierMask=mask(cmdKey, controlKey))
+            def _ekran():
+                self.ekran_metni()
+            self._hotkey = (_hizli, _ekran)
+            log("⌃⌘V ve ⌃⌘T kısayolları hazır")
         except Exception as e:
             log(f"quickmachotkey yok ({e}), klavye dinleyicisine geçiliyor")
             self._monitor_kur()
@@ -948,10 +1103,11 @@ class CepApp(NSObject):
         def h(ev):
             try:
                 f = ev.modifierFlags()
-                if ev.keyCode() == 9 and (f & MOD_CMD) and (f & CTRL) and \
-                        not (f & (MOD_SHIFT | MOD_ALT)):
-                    NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-                        0.01, self, "hizliTimer:", None, False)
+                if (f & MOD_CMD) and (f & CTRL) and not (f & (MOD_SHIFT | MOD_ALT)):
+                    sec = {9: "hizliTimer:", 17: "ekranTimer:"}.get(ev.keyCode())
+                    if sec:
+                        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                            0.01, self, sec, None, False)
             except Exception as e:
                 log(f"kısayol dinleyici hatası: {e}")
         self._gmon = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(1 << 10, h)
@@ -959,7 +1115,7 @@ class CepApp(NSObject):
             self._ax_soruldu = True
             log("⌃⌘V için Erişilebilirlik izni gerekli; izin verince Cep'i yeniden başlat")
         else:
-            log("⌃⌘V kısayolu hazır (klavye dinleyicisi)")
+            log("⌃⌘V ve ⌃⌘T kısayolları hazır (klavye dinleyicisi)")
 
     def hizliTimer_(self, timer):
         self.hizli_ac()

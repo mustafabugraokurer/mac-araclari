@@ -118,10 +118,19 @@ class Store:
         return {"id": uuid.uuid4().hex[:12], "kind": kind, "key": key,
                 "app": app or "", "ts": time.time(), "pinned": False, **kw}
 
-    def add_text(self, text: str, app: str = "") -> dict:
+    def add_text(self, text: str, app: str = "", gorselden: bool = False) -> dict:
         if not text or not text.strip():
             return None
-        return self._push(self._yeni(tur_bul(text), "t:" + _sha(text), app, text=text))
+        kw = {"gorselden": True} if gorselden else {}
+        return self._push(self._yeni(tur_bul(text), "t:" + _sha(text), app, text=text, **kw))
+
+    def set_ocr(self, item_id: str, text: str) -> dict:
+        """Görsel öğeye tanınan yazıyı ekle (aramada bulunsun diye)."""
+        item = self.get(item_id)
+        if item:
+            item["ocr"] = text or ""
+            self.save()
+        return item
 
     def add_image(self, png: bytes, w: int, h: int, app: str = "") -> dict:
         key = "i:" + _sha(png)
@@ -216,7 +225,8 @@ class Store:
             return list(self.history)
         sonuc = []
         for x in self.history:
-            metin = " ".join([x.get("text") or "", " ".join(x.get("paths") or []),
+            metin = " ".join([x.get("text") or "", x.get("ocr") or "",
+                              " ".join(x.get("paths") or []),
                               self.label(x), x.get("app") or ""])
             if q in self._norm(metin):
                 sonuc.append(x)
@@ -235,7 +245,13 @@ class Store:
 
     @staticmethod
     def detail(item: dict, now: float = None) -> str:
-        parca = [item.get("app")] if item.get("app") else []
+        parca = ["Görselden"] if item.get("gorselden") else []
+        if item.get("app"):
+            parca.append(item["app"])
+        if item.get("gorselden") and item.get("text"):
+            n = len([s for s in item["text"].splitlines() if s.strip()])
+            if n > 1:
+                parca.append(f"{n} satır")
         parca.append(once(item["ts"], now))
         return " · ".join(parca)
 

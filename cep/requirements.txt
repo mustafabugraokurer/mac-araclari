@@ -3,3 +3,4 @@ pyobjc-framework-Quartz
 pyobjc-framework-ApplicationServices
 quickmachotkey
 py2app
+pyobjc-framework-Vision

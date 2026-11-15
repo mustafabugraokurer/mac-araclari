@@ -1,8 +1,8 @@
 """
-Hareket.app oluşturur. Genelde doğrudan değil, install.sh üzerinden çalışır:
+Namaz.app oluşturur. Genelde doğrudan değil, install.sh üzerinden çalışır:
     ./install.sh
 Elle:
-    python3 setup.py py2app   ->  dist/Hareket.app
+    python3 setup.py py2app   ->  dist/Namaz.app
 """
 import os
 
@@ -11,9 +11,9 @@ from setuptools import setup
 OPTIONS = {
     "argv_emulation": False,
     "plist": {
-        "CFBundleName": "Hareket",
-        "CFBundleDisplayName": "Hareket",
-        "CFBundleIdentifier": "com.bugra.hareket",
+        "CFBundleName": "Namaz",
+        "CFBundleDisplayName": "Namaz",
+        "CFBundleIdentifier": "com.bugra.namaz",
         "CFBundleShortVersionString": "1.1",
         "CFBundleVersion": "1.1",
         "LSUIElement": True,          # Dock'ta görünmez, sadece menü çubuğu
@@ -21,14 +21,14 @@ OPTIONS = {
         "NSHumanReadableCopyright": "© 2026 Mustafa Buğra Okurer · MIT",
     },
     "packages": ["rumps"],
-    "includes": ["UserNotifications"],
+    "includes": ["UserNotifications", "vakit", "sehirler", "zoneinfo"],
 }
-if os.path.exists("Hareket.icns"):
-    OPTIONS["iconfile"] = "Hareket.icns"
+if os.path.exists("Namaz.icns"):
+    OPTIONS["iconfile"] = "Namaz.icns"
 
 setup(
-    app=["hareket.py"],
-    name="Hareket",
+    app=["namaz.py"],
+    name="Namaz",
     options={"py2app": OPTIONS},
     setup_requires=["py2app"],
 )
