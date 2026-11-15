@@ -199,3 +199,50 @@ def sehir_bilgi(ulke: str, sehir: str):
         return None
     k = u["sehirler"][sehir]
     return k[0], k[1], (k[2] if len(k) > 2 else u["tz"])
+
+
+# İngilizce ülke adları
+ULKE_EN = {
+    "Türkiye": "Türkiye", "KKTC": "Northern Cyprus", "Almanya": "Germany",
+    "Avusturya": "Austria", "Hollanda": "Netherlands", "Belçika": "Belgium",
+    "Fransa": "France", "İsviçre": "Switzerland", "Birleşik Krallık": "United Kingdom",
+    "İsveç": "Sweden", "Danimarka": "Denmark", "Norveç": "Norway", "İtalya": "Italy",
+    "İspanya": "Spain", "Bosna-Hersek": "Bosnia and Herzegovina", "Kosova": "Kosovo",
+    "Kuzey Makedonya": "North Macedonia", "Arnavutluk": "Albania", "Bulgaristan": "Bulgaria",
+    "Yunanistan": "Greece", "Azerbaycan": "Azerbaijan", "Gürcistan": "Georgia",
+    "Kazakistan": "Kazakhstan", "Özbekistan": "Uzbekistan", "Kırgızistan": "Kyrgyzstan",
+    "Türkmenistan": "Turkmenistan", "Rusya": "Russia", "Suudi Arabistan": "Saudi Arabia",
+    "Birleşik Arap Emirlikleri": "United Arab Emirates", "Katar": "Qatar", "Kuveyt": "Kuwait",
+    "Umman": "Oman", "Ürdün": "Jordan", "Filistin": "Palestine", "Lübnan": "Lebanon",
+    "Irak": "Iraq", "İran": "Iran", "Mısır": "Egypt", "Fas": "Morocco", "Cezayir": "Algeria",
+    "Tunus": "Tunisia", "Libya": "Libya", "Somali": "Somalia", "Nijerya": "Nigeria",
+    "Güney Afrika": "South Africa", "Pakistan": "Pakistan", "Hindistan": "India",
+    "Bangladeş": "Bangladesh", "Afganistan": "Afghanistan", "Endonezya": "Indonesia",
+    "Malezya": "Malaysia", "Singapur": "Singapore", "Japonya": "Japan",
+    "Güney Kore": "South Korea", "Çin": "China", "Doğu Türkistan": "East Turkestan (Xinjiang)",
+    "Avustralya": "Australia", "ABD": "United States", "Kanada": "Canada", "Brezilya": "Brazil",
+}
+
+# İngilizcede farklı yazılan şehir adları (Türkiye illeri olduğu gibi kalır)
+SEHIR_EN = {
+    "Lefkoşa": "Nicosia", "Girne": "Kyrenia", "Gazimağusa": "Famagusta",
+    "Münih": "Munich", "Köln": "Cologne", "Viyana": "Vienna", "Lahey": "The Hague",
+    "Brüksel": "Brussels", "Anvers": "Antwerp", "Gent": "Ghent", "Marsilya": "Marseille",
+    "Strazburg": "Strasbourg", "Zürih": "Zurich", "Cenevre": "Geneva", "Londra": "London",
+    "Göteborg": "Gothenburg", "Kopenhag": "Copenhagen", "Roma": "Rome", "Milano": "Milan",
+    "Barselona": "Barcelona", "Saraybosna": "Sarajevo", "Priştine": "Pristina",
+    "Üsküp": "Skopje", "Tiran": "Tirana", "Sofya": "Sofia", "Kırcaali": "Kardzhali",
+    "Filibe": "Plovdiv", "Atina": "Athens", "Gümülcine": "Komotini", "İskeçe": "Xanthi",
+    "Bakü": "Baku", "Gence": "Ganja", "Nahçıvan": "Nakhchivan", "Tiflis": "Tbilisi",
+    "Batum": "Batumi", "Almatı": "Almaty", "Taşkent": "Tashkent", "Semerkant": "Samarkand",
+    "Buhara": "Bukhara", "Bişkek": "Bishkek", "Aşkabat": "Ashgabat", "Moskova": "Moscow",
+    "Mekke": "Mecca", "Medine": "Medina", "Riyad": "Riyadh", "Cidde": "Jeddah",
+    "Abu Dabi": "Abu Dhabi", "Kuveyt": "Kuwait City", "Maskat": "Muscat", "Kudüs": "Jerusalem",
+    "Gazze": "Gaza", "Beyrut": "Beirut", "Bağdat": "Baghdad", "Kerkük": "Kirkuk",
+    "Tahran": "Tehran", "Tebriz": "Tabriz", "Kahire": "Cairo", "İskenderiye": "Alexandria",
+    "Kazablanka": "Casablanca", "Cezayir": "Algiers", "Tunus": "Tunis", "Trablus": "Tripoli",
+    "Mogadişu": "Mogadishu", "Karaçi": "Karachi", "Lahor": "Lahore", "İslamabad": "Islamabad",
+    "Haydarabad": "Hyderabad", "Dakka": "Dhaka", "Kabil": "Kabul", "Cakarta": "Jakarta",
+    "Seul": "Seoul", "Pekin": "Beijing", "Şanghay": "Shanghai", "Urumçi": "Urumqi",
+    "Kaşgar": "Kashgar", "Sidney": "Sydney",
+}

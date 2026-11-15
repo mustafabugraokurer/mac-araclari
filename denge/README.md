@@ -1,7 +1,7 @@
 # Denge — Kalk ve su iç hatırlatıcısı
 
 Hareket ve Su tek uygulamada. Menü çubuğunda sandalye ikonu, kalkmaya kalan süre
-(`24:13`) ve içtiğin bardak sayısı (`5/8`) yan yana durur.
+(`24 dk`) ve içtiğin bardak sayısı (`5/8`) yan yana durur.
 
 <p align="center">
   <img src="../docs/denge-menu.png" width="49%" alt="Menü">

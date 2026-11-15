@@ -15,6 +15,8 @@ import time
 import uuid
 from pathlib import Path
 
+from dil import t
+
 GECMIS_GUN = 30
 EN_FAZLA = 200
 
@@ -41,14 +43,14 @@ def once(ts: float, now: float = None) -> str:
     now = now or time.time()
     d = max(0, int(now - ts))
     if d < 45:
-        return "şimdi"
+        return t("şimdi")
     if d < 3600:
-        return f"{max(1, d // 60)} dk önce"
+        return t("{n} dk önce", n=max(1, d // 60))
     if d < 86400:
-        return f"{d // 3600} sa önce"
+        return t("{n} sa önce", n=d // 3600)
     if d < 2 * 86400:
-        return "dün"
-    return f"{d // 86400} gün önce"
+        return t("dün")
+    return t("{n} gün önce", n=d // 86400)
 
 
 def tek_satir(text: str, n: int = 52) -> str:
@@ -236,22 +238,22 @@ class Store:
     def label(item: dict) -> str:
         k = item["kind"]
         if k == "gorsel":
-            return f"Görsel  {item.get('w', '?')} × {item.get('h', '?')}"
+            return t("Görsel  {w} × {h}", w=item.get("w", "?"), h=item.get("h", "?"))
         if k == "dosya":
             ps = item["paths"]
             ad = os.path.basename(ps[0].rstrip("/")) or ps[0]
-            return tek_satir(ad) if len(ps) == 1 else f"{tek_satir(ad, 36)} + {len(ps) - 1} dosya"
+            return tek_satir(ad) if len(ps) == 1 else t("{ad} + {n} dosya", ad=tek_satir(ad, 36), n=len(ps) - 1)
         return tek_satir(item["text"])
 
     @staticmethod
     def detail(item: dict, now: float = None) -> str:
-        parca = ["Görselden"] if item.get("gorselden") else []
+        parca = [t("Görselden")] if item.get("gorselden") else []
         if item.get("app"):
             parca.append(item["app"])
         if item.get("gorselden") and item.get("text"):
             n = len([s for s in item["text"].splitlines() if s.strip()])
             if n > 1:
-                parca.append(f"{n} satır")
+                parca.append(t("{n} satır", n=n))
         parca.append(once(item["ts"], now))
         return " · ".join(parca)
 

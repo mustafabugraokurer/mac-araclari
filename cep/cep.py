@@ -36,6 +36,8 @@ from Foundation import NSBundle, NSFileManager, NSObject, NSProcessInfo, NSTimer
 from PyObjCTools import AppHelper
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dil  # noqa: E402
+from dil import t  # noqa: E402
 from store import Store  # noqa: E402
 from panel import PanelController  # noqa: E402
 
@@ -69,9 +71,49 @@ def log(msg):
         pass
 
 
+# İngilizce karşılıklar (anahtar: Türkçe metin) — store.py ve panel.py de kullanır
+CEVIRI = {
+    "{n} öğe": "{n} items", "boş": "empty", "Bırak: taşı": "Drop: move",
+    "Kopyala": "Copy", "⌥ basılı tutarak da bırakabilirsin": "or drop while holding ⌥",
+    "{n} satır kopyalandı.": "{n} lines copied.", "Sil: {e}": "Delete: {e}",
+    "Sabitlemeyi kaldır": "Unpin", "Sabitle": "Pin",
+    "Taşıma alanını gizle": "Hide shelf", "Taşıma alanını göster": "Show shelf",
+    "Seçince yapıştır": "Paste on select",
+    "Görsellerdeki yazıyı da kaydet": "Also save text found in images",
+    "Ekrandan metin seç": "Capture text from screen", "Kaydı duraklat": "Pause recording",
+    "Oturum açınca başlat": "Open at login",
+    "Sabitlenmemiş tüm öğeler silinsin mi?": "Delete all unpinned items?",
+    "Sabitlediklerin kalır. Bu işlem geri alınamaz.":
+        "Pinned items are kept. This can't be undone.",
+    "Temizle": "Clear", "Vazgeç": "Cancel", "Buraya taşı": "Move here",
+    "Taşıma alanındaki dosyalar bu klasöre taşınacak (kopyalanacak olarak işaretlenenler kopyalanır).":
+        "Files on the shelf will be moved to this folder (items marked to copy are copied).",
+    "Dosyalar kesilir, bırakana kadar burada bekler":
+        "Files are cut and wait here until you drop them",
+    "kes": "cut", "Ekrandan yazı alınamadı.": "Couldn't capture text from the screen.",
+    "Seçilen alanda yazı bulunamadı.": "No text found in the selected area.",
+    "Tıkla: kopyala   ⌥ sil   ⇧ sabitle": "Click: copy   ⌥ delete   ⇧ pin",
+    "Sabitlenenler": "Pinned", "Geçmiş": "History", "Daha eski ({n})": "Older ({n})",
+    "Sabitlenmemişleri temizle": "Clear unpinned", "Cep’ten çık": "Quit Cep",
+    "Bu seçenek Cep.app olarak kurulunca çalışır (install.sh).":
+        "This option works when installed as Cep.app (install.sh).",
+    "Taşıma alanı": "Shelf", "kesildi": "cut", "kopyalanacak": "will be copied",
+    "Buraya taşı…": "Move here…", " · kayıt duraklatıldı": " · recording paused",
+    "Henüz kopyalanan bir şey yok": "Nothing copied yet",
+    "Bazı dosyalar taşınamadı:": "Some files couldn't be moved:",
+    "Ara": "Search", "Ayarlar": "Settings", "Geçmiş 30 gün tutulur": "History is kept for 30 days",
+    " · {k} kez": " · {k}×", "Sonuçlar · {n}": "Results · {n}",
+    "Sabitlenenler · sen silene kadar kalır": "Pinned · kept until you remove them",
+    "Sık kullanılanlar": "Frequently used", "Sonuç yok": "No results",
+    "{n} gün önce": "{n} days ago", "şimdi": "now", "{n} dk önce": "{n} min ago",
+    "{n} sa önce": "{n} h ago", "dün": "yesterday", "Görsel  {w} × {h}": "Image  {w} × {h}",
+    "{ad} + {n} dosya": "{ad} + {n} files", "Görselden": "From image", "{n} satır": "{n} lines",
+}
+
+
 def ayar_oku():
     import json
-    d = {"yapistir": True, "duraklat": False, "ocr": True}
+    d = {"yapistir": True, "duraklat": False, "ocr": True, "dil": "oto"}
     try:
         d.update(json.loads(AYAR_FILE.read_text(encoding="utf-8")))
     except Exception:
@@ -279,8 +321,8 @@ class ShelfView(NSView, protocols=[objc.protocolNamed("NSDraggingSource")]):
         items = self.app.store.shelf
         W, p = self.bounds().size.width, 14
 
-        yazi("Taşıma alanı", 13, 0.4).drawInRect_(NSMakeRect(p, p - 2, 160, 18))
-        meta = f"{len(items)} öğe" if items else "boş"
+        yazi(t("Taşıma alanı"), 13, 0.4).drawInRect_(NSMakeRect(p, p - 2, 160, 18))
+        meta = t("{n} öğe", n=len(items)) if items else t("boş")
         yazi(meta, 11, 0, sec, hiza=2).drawInRect_(NSMakeRect(W - p - 110, p, 82, 16))
         k = L["kapat"]
         NSColor.colorWithWhite_alpha_(0.5, 0.18).set()
@@ -305,7 +347,7 @@ class ShelfView(NSView, protocols=[objc.protocolNamed("NSDraggingSource")]):
             ad = os.path.basename(x["path"].rstrip("/"))
             kaynak = NSFileManager.defaultManager().displayNameAtPath_(
                 os.path.dirname(x["path"].rstrip("/")))
-            alt = f"{kaynak} · " + ("kesildi" if x["mode"] == "kes" else "kopyalanacak")
+            alt = f"{kaynak} · " + (t("kesildi") if x["mode"] == "kes" else t("kopyalanacak"))
             yazi(ad, 13).drawInRect_(NSMakeRect(row.origin.x + 48, row.origin.y + 6,
                                                 row.size.width - 84, 18))
             yazi(alt, 11, 0, sec).drawInRect_(NSMakeRect(row.origin.x + 48, row.origin.y + 25,
@@ -323,7 +365,7 @@ class ShelfView(NSView, protocols=[objc.protocolNamed("NSDraggingSource")]):
         self._bolge(L["kopya"], "kopya", acc, sec, buyuk=False)
 
         if items:
-            for anahtar, metin, dolu in (("vazgec", "Vazgeç", False), ("tasi", "Buraya taşı…", True)):
+            for anahtar, metin, dolu in (("vazgec", t("Vazgeç"), False), ("tasi", t("Buraya taşı…"), True)):
                 rr = L[anahtar]
                 path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rr, 8, 8)
                 if dolu:
@@ -351,12 +393,12 @@ class ShelfView(NSView, protocols=[objc.protocolNamed("NSDraggingSource")]):
         (acc if (ad == "kes" or aktif) else NSColor.tertiaryLabelColor()).set()
         path.stroke()
         if ad == "kes":
-            baslik = "Bırak: taşı"
-            alt = "Dosyalar kesilir, bırakana kadar burada bekler" if buyuk else "kes"
+            baslik = t("Bırak: taşı")
+            alt = t("Dosyalar kesilir, bırakana kadar burada bekler") if buyuk else t("kes")
             renk = acc
         else:
-            baslik = "Kopyala"
-            alt = "⌥ basılı tutarak da bırakabilirsin"
+            baslik = t("Kopyala")
+            alt = t("⌥ basılı tutarak da bırakabilirsin")
             renk = NSColor.labelColor()
         if buyuk:
             ic = sembol("scissors", 28)
@@ -546,6 +588,7 @@ class CepApp(NSObject):
             return None
         self.store = Store(DATA_DIR)
         self.ayar = ayar_oku()
+        dil.ayarla(self.ayar.get("dil", "oto"), CEVIRI)
         self.pb = NSPasteboard.generalPasteboard()
         self.last_cc = self.pb.changeCount()
         self.own_cc = -1
@@ -720,10 +763,10 @@ class CepApp(NSObject):
             return
         if hata:
             log(f"ekrandan yazı alınamadı: {hata}")
-            bildir("Cep", "Ekrandan yazı alınamadı.")
+            bildir("Cep", t("Ekrandan yazı alınamadı."))
             return
         if len(metin.strip()) < 2:
-            bildir("Cep", "Seçilen alanda yazı bulunamadı.")
+            bildir("Cep", t("Seçilen alanda yazı bulunamadı."))
             return
         try:
             app = NSWorkspace.sharedWorkspace().frontmostApplication().localizedName() or ""
@@ -733,7 +776,7 @@ class CepApp(NSObject):
         if item:
             self._panoya_yaz(item)
         n = len([x for x in metin.splitlines() if x.strip()])
-        bildir("Cep", f"{n} satır kopyalandı.")
+        bildir("Cep", t("{n} satır kopyalandı.", n=n))
         log(f"ekrandan yazı kopyalandı: {n} satır")
         if self.panel is not None and self.panel.acik():
             self.panel.yenile()
@@ -806,11 +849,11 @@ class CepApp(NSObject):
         except Exception:
             pass
         menu.addItem_(ana)
-        sil = self._mi(f"Sil: {etiket}", "itemDelete:", key, MOD_ALT, item["id"])
+        sil = self._mi(t("Sil: {e}", e=etiket), "itemDelete:", key, MOD_ALT, item["id"])
         sil.setImage_(sembol("trash", 15))
         sil.setAlternate_(True)
         menu.addItem_(sil)
-        pin_t = "Sabitlemeyi kaldır" if item["pinned"] else "Sabitle"
+        pin_t = t("Sabitlemeyi kaldır") if item["pinned"] else t("Sabitle")
         pin = self._mi(f"{pin_t}: {etiket}", "itemPin:", key, MOD_SHIFT, item["id"])
         pin.setImage_(sembol("pin.slash" if item["pinned"] else "pin", 15))
         pin.setAlternate_(True)
@@ -820,29 +863,29 @@ class CepApp(NSObject):
     def _menu_kur(self, menu):
         menu.removeAllItems()
         ipucu = self._mi("")
-        ipucu.setAttributedTitle_(yazi("Tıkla: kopyala   ⌥ sil   ⇧ sabitle", 11, 0,
+        ipucu.setAttributedTitle_(yazi(t("Tıkla: kopyala   ⌥ sil   ⇧ sabitle"), 11, 0,
                                        NSColor.secondaryLabelColor(), kes=False))
         menu.addItem_(ipucu)
 
         pinned = self.store.pinned()
         if pinned:
             menu.addItem_(NSMenuItem.separatorItem())
-            self._baslik(menu, "Sabitlenenler")
+            self._baslik(menu, t("Sabitlenenler"))
             for it in pinned:
                 self._gecmis_ogesi(menu, it)
 
         recent = self.store.recent()
         menu.addItem_(NSMenuItem.separatorItem())
         if self.ayar["duraklat"]:
-            self._baslik(menu, "Geçmiş · kayıt duraklatıldı")
+            self._baslik(menu, t("Geçmiş") + t(" · kayıt duraklatıldı"))
         else:
-            self._baslik(menu, "Geçmiş")
+            self._baslik(menu, t("Geçmiş"))
         if not recent:
-            menu.addItem_(self._mi("Henüz kopyalanan bir şey yok"))
+            menu.addItem_(self._mi(t("Henüz kopyalanan bir şey yok")))
         for i, it in enumerate(recent[:MENU_MAX]):
             self._gecmis_ogesi(menu, it, str(i + 1) if i < 9 else "")
         if len(recent) > MENU_MAX:
-            daha = self._mi(f"Daha eski ({len(recent) - MENU_MAX})", None)
+            daha = self._mi(t("Daha eski ({n})", n=len(recent) - MENU_MAX), None)
             daha.setEnabled_(True)
             alt = NSMenu.alloc().init()
             alt.setAutoenablesItems_(False)
@@ -854,31 +897,32 @@ class CepApp(NSObject):
         menu.addItem_(NSMenuItem.separatorItem())
         n = len(self.store.shelf)
         gorunur = bool(self.shelf_panel and self.shelf_panel.isVisible())
-        t = "Taşıma alanını gizle" if gorunur else "Taşıma alanını göster"
-        tasima = self._mi(t + (f"  ({n})" if n else ""), "toggleShelf:")
+        baslik = t("Taşıma alanını gizle") if gorunur else t("Taşıma alanını göster")
+        tasima = self._mi(baslik + (f"  ({n})" if n else ""), "toggleShelf:")
         tasima.setImage_(sembol("tray.and.arrow.down", 15))
         menu.addItem_(tasima)
 
         menu.addItem_(NSMenuItem.separatorItem())
-        yap = self._mi("Seçince yapıştır", "togglePaste:")
+        yap = self._mi(t("Seçince yapıştır"), "togglePaste:")
         yap.setState_(1 if self.ayar["yapistir"] else 0)
         menu.addItem_(yap)
-        ocr = self._mi("Görsellerdeki yazıyı da kaydet", "toggleOcr:")
+        ocr = self._mi(t("Görsellerdeki yazıyı da kaydet"), "toggleOcr:")
         ocr.setState_(1 if self.ayar.get("ocr", True) else 0)
         menu.addItem_(ocr)
-        ek = self._mi("Ekrandan metin seç", "ekranMenu:", "t", MOD_CMD | (1 << 18))
+        ek = self._mi(t("Ekrandan metin seç"), "ekranMenu:", "t", MOD_CMD | (1 << 18))
         ek.setImage_(sembol("text.viewfinder", 15))
         menu.addItem_(ek)
-        dur = self._mi("Kaydı duraklat", "togglePause:")
+        dur = self._mi(t("Kaydı duraklat"), "togglePause:")
         dur.setState_(1 if self.ayar["duraklat"] else 0)
         menu.addItem_(dur)
-        giris = self._mi("Oturum açınca başlat", "toggleLogin:")
+        giris = self._mi(t("Oturum açınca başlat"), "toggleLogin:")
         giris.setState_(1 if AGENT_FILE.exists() else 0)
         menu.addItem_(giris)
-        menu.addItem_(self._mi("Sabitlenmemişleri temizle", "clearUnpinned:",
+        menu.addItem_(self._mi(t("Sabitlenmemişleri temizle"), "clearUnpinned:",
                                enabled=bool(recent)))
+        menu.addItem_(self._dil_menusu())
         menu.addItem_(NSMenuItem.separatorItem())
-        menu.addItem_(self._mi("Cep’ten çık", "quit:", "q", MOD_CMD))
+        menu.addItem_(self._mi(t("Cep’ten çık"), "quit:", "q", MOD_CMD))
 
     # ---- menü eylemleri
     def itemClicked_(self, sender):
@@ -931,7 +975,7 @@ class CepApp(NSObject):
             return
         exe = bundle_exe()
         if not exe:
-            self._uyari("Bu seçenek Cep.app olarak kurulunca çalışır (install.sh).")
+            self._uyari(t("Bu seçenek Cep.app olarak kurulunca çalışır (install.sh)."))
             return
         AGENT_FILE.parent.mkdir(parents=True, exist_ok=True)
         with AGENT_FILE.open("wb") as f:
@@ -942,16 +986,39 @@ class CepApp(NSObject):
 
     def clearUnpinned_(self, sender):
         a = NSAlert.alloc().init()
-        a.setMessageText_("Sabitlenmemiş tüm öğeler silinsin mi?")
-        a.setInformativeText_("Sabitlediklerin kalır. Bu işlem geri alınamaz.")
-        a.addButtonWithTitle_("Temizle")
-        a.addButtonWithTitle_("Vazgeç")
+        a.setMessageText_(t("Sabitlenmemiş tüm öğeler silinsin mi?"))
+        a.setInformativeText_(t("Sabitlediklerin kalır. Bu işlem geri alınamaz."))
+        a.addButtonWithTitle_(t("Temizle"))
+        a.addButtonWithTitle_(t("Vazgeç"))
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if a.runModal() == 1000:
             n = self.store.clear_unpinned()
             log(f"{n} öğe temizlendi")
             if getattr(self, "panel", None) is not None and self.panel.acik():
                 self.panel.yenile()
+
+    @objc.python_method
+    def _dil_menusu(self):
+        ana = self._mi("Dil / Language", None)
+        ana.setEnabled_(True)
+        alt = NSMenu.alloc().init()
+        alt.setAutoenablesItems_(False)
+        secili = self.ayar.get("dil", "oto")
+        for kod, ad in (("oto", "Sistem / System"), ("tr", "Türkçe"), ("en", "English")):
+            it = self._mi(ad, "dilSec:", rep=kod)
+            it.setState_(1 if kod == secili else 0)
+            alt.addItem_(it)
+        ana.setSubmenu_(alt)
+        return ana
+
+    def dilSec_(self, sender):
+        yeni = str(sender.representedObject() or "oto")
+        if yeni == self.ayar.get("dil", "oto"):
+            return
+        self.ayar["dil"] = yeni
+        ayar_yaz(self.ayar)
+        log(f"dil değişti: {yeni}, yeniden başlatılıyor")
+        dil.yeniden_baslat(AGENT_FILE.exists())
 
     def quit_(self, sender):
         log("Cep kapatıldı")
@@ -996,30 +1063,31 @@ class CepApp(NSObject):
         menu = NSMenu.alloc().init()
         menu.setAutoenablesItems_(False)
         n = len(self.store.shelf)
-        t = self._mi("Taşıma alanı" + (f"  ({n})" if n else ""), "toggleShelf:")
-        t.setImage_(sembol("tray.and.arrow.down", 15))
-        menu.addItem_(t)
+        tas = self._mi(t("Taşıma alanı") + (f"  ({n})" if n else ""), "toggleShelf:")
+        tas.setImage_(sembol("tray.and.arrow.down", 15))
+        menu.addItem_(tas)
         menu.addItem_(NSMenuItem.separatorItem())
-        yap = self._mi("Seçince yapıştır", "togglePaste:")
+        yap = self._mi(t("Seçince yapıştır"), "togglePaste:")
         yap.setState_(1 if self.ayar["yapistir"] else 0)
         menu.addItem_(yap)
-        ocr = self._mi("Görsellerdeki yazıyı da kaydet", "toggleOcr:")
+        ocr = self._mi(t("Görsellerdeki yazıyı da kaydet"), "toggleOcr:")
         ocr.setState_(1 if self.ayar.get("ocr", True) else 0)
         menu.addItem_(ocr)
-        ek = self._mi("Ekrandan metin seç", "ekranMenu:", "t", MOD_CMD | (1 << 18))
+        ek = self._mi(t("Ekrandan metin seç"), "ekranMenu:", "t", MOD_CMD | (1 << 18))
         ek.setImage_(sembol("text.viewfinder", 15))
         menu.addItem_(ek)
-        dur = self._mi("Kaydı duraklat", "togglePause:")
+        dur = self._mi(t("Kaydı duraklat"), "togglePause:")
         dur.setState_(1 if self.ayar["duraklat"] else 0)
         menu.addItem_(dur)
-        giris = self._mi("Oturum açınca başlat", "toggleLogin:")
+        giris = self._mi(t("Oturum açınca başlat"), "toggleLogin:")
         giris.setState_(1 if AGENT_FILE.exists() else 0)
         menu.addItem_(giris)
         menu.addItem_(NSMenuItem.separatorItem())
-        menu.addItem_(self._mi("Sabitlenmemişleri temizle", "clearUnpinned:",
+        menu.addItem_(self._mi(t("Sabitlenmemişleri temizle"), "clearUnpinned:",
                                enabled=bool(self.store.recent())))
+        menu.addItem_(self._dil_menusu())
         menu.addItem_(NSMenuItem.separatorItem())
-        menu.addItem_(self._mi("Cep’ten çık", "quit:", "q", MOD_CMD))
+        menu.addItem_(self._mi(t("Cep’ten çık"), "quit:", "q", MOD_CMD))
         return menu
 
     @objc.python_method
@@ -1299,9 +1367,9 @@ class CepApp(NSObject):
         op.setCanChooseDirectories_(True)
         op.setCanChooseFiles_(False)
         op.setCanCreateDirectories_(True)
-        op.setPrompt_("Buraya taşı")
-        op.setMessage_("Taşıma alanındaki dosyalar bu klasöre taşınacak "
-                       "(kopyalanacak olarak işaretlenenler kopyalanır).")
+        op.setPrompt_(t("Buraya taşı"))
+        op.setMessage_(t("Taşıma alanındaki dosyalar bu klasöre taşınacak "
+                         "(kopyalanacak olarak işaretlenenler kopyalanır)."))
         if op.runModal() != 1:
             return
         hedef = str(op.URL().path())
@@ -1309,7 +1377,7 @@ class CepApp(NSObject):
         hatalar = [(x, d) for x, _, d in sonuc if d not in ("tamam", "zaten orada")]
         log(f"'{hedef}' klasörüne: {len(sonuc) - len(hatalar)} tamam, {len(hatalar)} hata")
         if hatalar:
-            self._uyari("Bazı dosyalar taşınamadı:\n" + "\n".join(
+            self._uyari(t("Bazı dosyalar taşınamadı:") + "\n" + "\n".join(
                 f"• {os.path.basename(x['path'])}: {d}" for x, d in hatalar))
         self.shelf_refresh()
 

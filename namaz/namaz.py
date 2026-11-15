@@ -20,7 +20,10 @@ from pathlib import Path
 
 import rumps
 
-from sehirler import ULKELER, sehir_bilgi
+import dil
+from dil import t
+
+from sehirler import SEHIR_EN, ULKE_EN, ULKELER, sehir_bilgi
 from vakit import ADLAR, VAKITLER, YONTEMLER, vakitler
 
 try:
@@ -56,6 +59,7 @@ DEFAULTS = {
     "takip_dk": 30,
     "ses": False,
     "sadece_ikon": False,
+    "dil": "oto",            # "oto" (Mac'in diline göre) / "tr" / "en"
 }
 ONCE_SECENEKLERI = [0, 5, 10, 15, 30, 45]
 TAKIP_SECENEKLERI = [15, 30, 45, 60]
@@ -68,6 +72,110 @@ AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağu
          "Eylül", "Ekim", "Kasım", "Aralık"]
 GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
 GUN_KISA = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
+AYLAR_EN = ["January", "February", "March", "April", "May", "June", "July", "August",
+            "September", "October", "November", "December"]
+GUNLER_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+GUN_KISA_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+VAKIT_EN = {"imsak": "Fajr", "gunes": "Sunrise", "ogle": "Dhuhr", "ikindi": "Asr",
+            "aksam": "Maghrib", "yatsi": "Isha"}
+YONTEM_EN = {
+    "diyanet": "Diyanet (Turkey)", "mwl": "Muslim World League", "isna": "ISNA (North America)",
+    "misir": "Egypt", "ummulkura": "Umm al-Qura (Saudi Arabia)", "karachi": "Karachi (South Asia)",
+    "korfez": "Gulf (UAE)", "kuveyt": "Kuwait", "katar": "Qatar", "singapur": "Singapore",
+    "malezya": "Malaysia (JAKIM)", "endonezya": "Indonesia (Kemenag)", "fas": "Morocco",
+    "fransa": "France (UOIF, 12°)", "rusya": "Russia",
+}
+
+
+# İngilizce karşılıklar (anahtar: Türkçe metin)
+CEVIRI = {
+    "{dk} dk": "{dk} min",
+    "{sa} sa {dk} dk": "{sa} h {dk} min",
+    "{sa} sa": "{sa} h",
+    "Konum · {sehir}, {ulke}": "Location · {sehir}, {ulke}",
+    "Hesaplama yöntemi · {y}": "Calculation method · {y}",
+    "İnternetsiz hesaplanır · Kesin vakit için yerel takvim esastır":
+        "Calculated offline · Your local official timetable takes precedence",
+    "Kıldığın vakte tıkla, işaretlensin": "Click a prayer to mark it as prayed",
+    "Haftalık takip": "Weekly tracker",
+    "Konum": "Location",
+    "Hesaplama yöntemi": "Calculation method",
+    "İkindi: Hanefi (2 misli gölge)": "Asr: Hanafi (shadow length 2×)",
+    "Vakitten önce haber ver": "Remind before prayer time",
+    "Vakit girince bildir": "Notify at prayer time",
+    "Kılınmadıysa vakit çıkmadan hatırlat": "Remind before time runs out if not prayed",
+    "Bildirim sesi": "Notification sound",
+    "Sadece ikon göster": "Show icon only",
+    "Oturum açınca başlat": "Open at login",
+    "Bildirimler": "Notifications",
+    "Güneşin doğmasına": "Until sunrise",
+    "Ülkeye göre (önerilen)": "By country (recommended)",
+    "Kapalı": "Off",
+    "{dk} dk kala": "{dk} min before",
+    "Namaz'dan çık": "Quit Namaz",
+    "Ülkeye göre (önerilen: {y})": "By country (recommended: {y})",
+    "kapalı": "off",
+    "İmsak vaktine": "Until Fajr",
+    "{ad} ezanına": "Until {ad}",
+    " · şu an": " · now",
+    "{a} / {b} vakit kılındı": "{a} / {b} prayers done",
+    "Son 7 günde vakti giren namazların {oran}'i · kılınmayan: {n}":
+        "{oran} of the prayers due in the last 7 days · missed: {n}",
+    "Bu seçenek uygulama Namaz.app olarak kurulduğunda çalışır.":
+        "This option works when the app is installed as Namaz.app.",
+    "{dk} dk önce": "{dk} min before",
+    "Bugün kılınan: {a}/{b}": "Prayed today: {a}/{b}",
+    "Bugün henüz vakit girmedi": "No prayer time has started yet today",
+    " · sabah namazı": "",
+    "Güneş doğuşuna kadar · {s}": "Until sunrise · {s}",
+    "{ad} vakti girdi": "It's time for {ad}",
+    "Bugün": "Today",
+    "Namaz · Son 7 gün": "Namaz · Last 7 days",
+    "Güneşin doğmasına {n} dakika": "{n} minutes until sunrise",
+    "Sabah namazının vakti {s} itibarıyla çıkıyor · {sehir}": "Fajr time ends at {s} · {sehir}",
+    "{ad} vaktine kadar · {s}": "Until {ad} · {s}",
+    "İmsak vaktine kadar · {s}": "Until Fajr · {s}",
+    " · Kılınca menüden işaretle": " · Mark it in the menu when done",
+    "{ad} namazının vakti çıkıyor": "{ad} time is running out",
+    "{kalan} kaldı ({s}) · Kıldıysan menüden işaretle":
+        "{kalan} left (until {s}) · Mark it in the menu if you prayed",
+    "İmsak vaktine {n} dakika": "{n} minutes until Fajr",
+    "{ad} ezanına {n} dakika": "{n} minutes until {ad}",
+}
+
+
+def en() -> bool:
+    return dil.kod() == "en"
+
+
+def vakit_adi(k):
+    return VAKIT_EN[k] if en() else ADLAR[k]
+
+
+def namaz_adi(k):
+    return VAKIT_EN[k] if en() else NAMAZ_ADI[k]
+
+
+def ulke_adi(u):
+    return ULKE_EN.get(u, u) if en() else u
+
+
+def sehir_adi(s):
+    return SEHIR_EN.get(s, s) if en() else s
+
+
+def yontem_adi(kod):
+    return YONTEM_EN.get(kod, YONTEMLER[kod]["ad"]) if en() else YONTEMLER[kod]["ad"]
+
+
+def tarih_metni(g):
+    if en():
+        return f"{GUNLER_EN[g.weekday()]}, {AYLAR_EN[g.month - 1]} {g.day}"
+    return f"{g.day} {AYLAR[g.month - 1]} {GUNLER[g.weekday()]}"
+
+
+def gun_kisa(g):
+    return f"{(GUN_KISA_EN if en() else GUN_KISA)[g.weekday()]} {g.day}"
 
 
 def log(msg):
@@ -118,10 +226,10 @@ def kalan_metin(sn: float, kisa=False) -> str:
     if kisa:
         return f"{sa}:{dk:02d}"
     if sa and dk:
-        return f"{sa} sa {dk} dk"
+        return t("{sa} sa {dk} dk", sa=sa, dk=dk)
     if sa:
-        return f"{sa} sa"
-    return f"{dk} dk"
+        return t("{sa} sa", sa=sa)
+    return t("{dk} dk", dk=dk)
 
 
 def bundle_executable():
@@ -261,7 +369,7 @@ if HAS_APPKIT:
             normal = {NSFontAttributeName: NSFont.systemFontOfSize_(13),
                       NSForegroundColorAttributeName: NSColor.labelColor()}
             for j, k in enumerate(NAMAZLAR):
-                NSString.stringWithString_(NAMAZ_ADI[k]).drawAtPoint_withAttributes_(
+                NSString.stringWithString_(namaz_adi(k)).drawAtPoint_withAttributes_(
                     NSMakePoint(0, ust + j * satir + 6), normal)
             for i, (etiket, durumlar) in enumerate(gunler):
                 x = sol + i * sutun + sutun / 2
@@ -307,6 +415,7 @@ class NamazApp(rumps.App):
     def __init__(self):
         super().__init__("Namaz", title="Namaz", quit_button=None)
         self.s = load_settings()
+        dil.ayarla(self.s.get("dil", "oto"), CEVIRI)
         self.takip = Takip()
         self.notifier = None
         self._activity = None
@@ -320,54 +429,69 @@ class NamazApp(rumps.App):
         self.gonderilen = set()
 
         self.m_ozet = rumps.MenuItem("Namaz")
-        self.m_liste = {k: rumps.MenuItem(ADLAR[k], callback=self.vakit_tikla)
+        self.m_liste = {k: rumps.MenuItem(vakit_adi(k), callback=self.vakit_tikla)
                         for k in VAKITLER}
         self.m_liste["gunes"].set_callback(None)
-        self.m_ipucu = rumps.MenuItem("Kıldığın vakte tıkla, işaretlensin")
-        self.m_haftalik = rumps.MenuItem("Haftalık takip", callback=self.haftalik_ac, key="t")
+        self.m_ipucu = rumps.MenuItem(t("Kıldığın vakte tıkla, işaretlensin"))
+        self.m_haftalik = rumps.MenuItem(t("Haftalık takip"), callback=self.haftalik_ac, key="t")
 
-        self.m_konum = rumps.MenuItem("Konum")
-        sira = sorted(ULKELER, key=self._sirala)
+        self.m_konum = rumps.MenuItem(t("Konum"))
+        self._konum = []            # [(ülke, menü, {şehir: menü})]
+        sira = sorted(ULKELER, key=lambda u: self._sirala(ulke_adi(u)))
         sira.remove("Türkiye")
         for i, ulke in enumerate(["Türkiye"] + sira):
-            m_u = rumps.MenuItem(ulke)
-            for sehir in sorted(ULKELER[ulke]["sehirler"], key=self._sirala):
-                m_u.add(rumps.MenuItem(sehir, callback=self._sehir_cb(ulke, sehir)))
+            m_u = rumps.MenuItem(ulke_adi(ulke))
+            sehirler = {}
+            for sehir in sorted(ULKELER[ulke]["sehirler"], key=lambda x: self._sirala(sehir_adi(x))):
+                m_s = rumps.MenuItem(sehir_adi(sehir), callback=self._sehir_cb(ulke, sehir))
+                m_u.add(m_s)
+                sehirler[sehir] = m_s
             self.m_konum.add(m_u)
+            self._konum.append((ulke, m_u, sehirler))
             if i == 0:
                 self.m_konum.add(None)
 
-        self.m_yontem = rumps.MenuItem("Hesaplama yöntemi")
-        self.m_yontem.add(rumps.MenuItem("Ülkeye göre (önerilen)", callback=self.yontem_sec))
+        self.m_yontem = rumps.MenuItem(t("Hesaplama yöntemi"))
+        self._yontemler = {"oto": rumps.MenuItem(t("Ülkeye göre (önerilen)"),
+                                                 callback=self._yontem_cb("oto"))}
+        self.m_yontem.add(self._yontemler["oto"])
         self.m_yontem.add(None)
-        for kod, y in YONTEMLER.items():
-            self.m_yontem.add(rumps.MenuItem(y["ad"], callback=self.yontem_sec))
-        self.m_hanefi = rumps.MenuItem("İkindi: Hanefi (2 misli gölge)",
+        for kod in YONTEMLER:
+            self._yontemler[kod] = rumps.MenuItem(yontem_adi(kod), callback=self._yontem_cb(kod))
+            self.m_yontem.add(self._yontemler[kod])
+        self.m_hanefi = rumps.MenuItem(t("İkindi: Hanefi (2 misli gölge)"),
                                        callback=self.hanefi_degistir)
 
-        self.m_once = rumps.MenuItem("Vakitten önce haber ver")
+        self.m_once = rumps.MenuItem(t("Vakitten önce haber ver"))
+        self._once = {}
         for dk in ONCE_SECENEKLERI:
-            self.m_once.add(rumps.MenuItem("Kapalı" if dk == 0 else f"{dk} dk önce",
-                                           callback=self.once_sec))
-        self.m_vakitte = rumps.MenuItem("Vakit girince bildir", callback=self.vakitte_degistir)
-        self.m_takip_h = rumps.MenuItem("Kılınmadıysa vakit çıkmadan hatırlat")
-        self.m_takip_h.add(rumps.MenuItem("Kapalı", callback=self.takip_sec))
+            self._once[dk] = rumps.MenuItem(t("Kapalı") if dk == 0 else t("{dk} dk önce", dk=dk),
+                                            callback=self._once_cb(dk))
+            self.m_once.add(self._once[dk])
+        self.m_vakitte = rumps.MenuItem(t("Vakit girince bildir"), callback=self.vakitte_degistir)
+        self.m_takip_h = rumps.MenuItem(t("Kılınmadıysa vakit çıkmadan hatırlat"))
+        self._takip_m = {0: rumps.MenuItem(t("Kapalı"), callback=self._takip_cb(0))}
+        self.m_takip_h.add(self._takip_m[0])
         for dk in TAKIP_SECENEKLERI:
-            self.m_takip_h.add(rumps.MenuItem(f"{dk} dk kala", callback=self.takip_sec))
-        self.m_ses = rumps.MenuItem("Bildirim sesi", callback=self.ses_degistir)
-        self.m_ikon = rumps.MenuItem("Sadece ikon göster", callback=self.ikon_degistir)
-        self.m_giris = rumps.MenuItem("Oturum açınca başlat", callback=self.giris_degistir)
+            self._takip_m[dk] = rumps.MenuItem(t("{dk} dk kala", dk=dk), callback=self._takip_cb(dk))
+            self.m_takip_h.add(self._takip_m[dk])
+        self.m_ses = rumps.MenuItem(t("Bildirim sesi"), callback=self.ses_degistir)
+        self.m_ikon = rumps.MenuItem(t("Sadece ikon göster"), callback=self.ikon_degistir)
+        self.m_giris = rumps.MenuItem(t("Oturum açınca başlat"), callback=self.giris_degistir)
+        self.m_dil = rumps.MenuItem("Dil / Language")
+        for ad in ("Sistem / System", "Türkçe", "English"):
+            self.m_dil.add(rumps.MenuItem(ad, callback=self.dil_sec))
         self.m_bilgi = rumps.MenuItem("")
 
-        self.m_ayarlar = rumps.MenuItem("Bildirimler")
+        self.m_ayarlar = rumps.MenuItem(t("Bildirimler"))
         for m in (self.m_once, self.m_vakitte, self.m_takip_h, self.m_ses):
             self.m_ayarlar.add(m)
 
         self.menu = [self.m_ozet, None, *[self.m_liste[k] for k in VAKITLER], self.m_ipucu,
                      self.m_haftalik, None,
                      self.m_konum, self.m_yontem, self.m_hanefi, self.m_ayarlar,
-                     self.m_ikon, self.m_giris, None, self.m_bilgi,
-                     rumps.MenuItem("Namaz'dan çık", callback=self.cik, key="q")]
+                     self.m_ikon, self.m_giris, self.m_dil, None, self.m_bilgi,
+                     rumps.MenuItem(t("Namaz'dan çık"), callback=self.cik, key="q")]
         self._hesapla()
         self._isaretler()
         self.timer = rumps.Timer(self.tick, TICK)
@@ -480,71 +604,66 @@ class NamazApp(rumps.App):
     # ---- ekran
     def _isaretler(self):
         s = self.s
-        for ulke_item in self.m_konum.values():
-            if not isinstance(ulke_item, rumps.MenuItem):
-                continue
-            ulke_item.state = ulke_item.title == s["ulke"]
-            for sehir_item in ulke_item.values():
-                sehir_item.state = (ulke_item.title == s["ulke"] and
-                                    sehir_item.title == s["sehir"])
-        for item in self.m_once.values():
-            dk = 0 if item.title == "Kapalı" else int(item.title.split()[0])
+        for ulke, m_u, sehirler in self._konum:
+            m_u.state = ulke == s["ulke"]
+            for sehir, m_s in sehirler.items():
+                m_s.state = ulke == s["ulke"] and sehir == s["sehir"]
+        for dk, item in self._once.items():
             item.state = dk == s["once_dk"]
-        for item in self.m_takip_h.values():
-            if item.title == "Kapalı":
-                item.state = not s["takip_hatirlat"]
-            else:
-                item.state = s["takip_hatirlat"] and int(item.title.split()[0]) == s["takip_dk"]
-        oneri = YONTEMLER[ULKELER[s["ulke"]]["yontem"]]["ad"]
-        for item in self.m_yontem.values():
-            if not isinstance(item, rumps.MenuItem):
-                continue
-            if item.title.startswith("Ülkeye göre"):
-                item.title = f"Ülkeye göre (önerilen: {oneri})"
+        for dk, item in self._takip_m.items():
+            item.state = (not s["takip_hatirlat"]) if dk == 0 else \
+                (s["takip_hatirlat"] and dk == s["takip_dk"])
+        oneri = yontem_adi(ULKELER[s["ulke"]]["yontem"])
+        for kod, item in self._yontemler.items():
+            if kod == "oto":
+                item.title = t("Ülkeye göre (önerilen: {y})", y=oneri)
                 item.state = s["yontem"] == "oto"
             else:
-                item.state = s["yontem"] != "oto" and YONTEMLER[s["yontem"]]["ad"] == item.title
-        self.m_konum.title = f"Konum · {s['sehir']}, {s['ulke']}"
-        self.m_yontem.title = f"Hesaplama yöntemi · {YONTEMLER[self.yontem()]['ad']}"
+                item.state = s["yontem"] == kod
+        self.m_konum.title = t("Konum · {sehir}, {ulke}", sehir=sehir_adi(s["sehir"]),
+                               ulke=ulke_adi(s["ulke"]))
+        self.m_yontem.title = t("Hesaplama yöntemi · {y}", y=yontem_adi(self.yontem()))
         self.m_hanefi.state = self.hanefi()
-        self.m_once.title = ("Vakitten önce haber ver · " +
-                             (f"{s['once_dk']} dk" if s["once_dk"] else "kapalı"))
-        self.m_takip_h.title = ("Kılınmadıysa vakit çıkmadan hatırlat · " +
-                                (f"{s['takip_dk']} dk kala" if s["takip_hatirlat"]
-                                 else "kapalı"))
+        self.m_once.title = (t("Vakitten önce haber ver") + " · " +
+                             (t("{dk} dk", dk=s["once_dk"]) if s["once_dk"] else t("kapalı")))
+        self.m_takip_h.title = (t("Kılınmadıysa vakit çıkmadan hatırlat") + " · " +
+                                (t("{dk} dk kala", dk=s["takip_dk"]) if s["takip_hatirlat"]
+                                 else t("kapalı")))
+        for item in self.m_dil.values():
+            item.state = item.title == {"tr": "Türkçe", "en": "English"}.get(
+                s.get("dil"), "Sistem / System")
         self.m_vakitte.state = bool(s["vakitte_bildir"])
         self.m_ses.state = bool(s["ses"])
         self.m_ikon.state = bool(s["sadece_ikon"])
         self.m_giris.state = agent_installed()
-        self.m_bilgi.title = "İnternetsiz hesaplanır · Kesin vakit için yerel takvim esastır"
+        self.m_bilgi.title = t("İnternetsiz hesaplanır · Kesin vakit için yerel takvim esastır")
 
     def _ekran(self, now):
         simdiki, sonraki, zaman = self._simdiki_sonraki(now)
         kalan = (zaman - now).total_seconds()
-        ad = ADLAR[sonraki]
+        ad = vakit_adi(sonraki)
         if sonraki == "gunes":
-            hedef = "Güneşin doğmasına"
+            hedef = t("Güneşin doğmasına")
         elif sonraki == "imsak":
-            hedef = "İmsak vaktine"
+            hedef = t("İmsak vaktine")
         else:
-            hedef = f"{ad} ezanına"
+            hedef = t("{ad} ezanına", ad=ad)
         bugun = now.date()
         takip_gun = self._takip_gunu(now)
         kilinan = self.takip.sayi(bugun)
         girmis = sum(1 for k in NAMAZLAR if self._v[k] <= now)
         if self._header:
             ust, orta, buyuk, alt = self._header
-            ust.setStringValue_(f"{self.s['sehir']} · {bugun.day} {AYLAR[bugun.month - 1]} "
-                                f"{GUNLER[bugun.weekday()]}")
+            ust.setStringValue_(f"{sehir_adi(self.s['sehir'])} · {tarih_metni(bugun)}")
             orta.setStringValue_(hedef)
             buyuk.setStringValue_(kalan_metin(kalan))
-            alt.setStringValue_(f"Bugün kılınan: {kilinan}/{girmis}" if girmis
-                                else "Bugün henüz vakit girmedi")
+            alt.setStringValue_(t("Bugün kılınan: {a}/{b}", a=kilinan, b=girmis) if girmis
+                                else t("Bugün henüz vakit girmedi"))
         for k in VAKITLER:
             item = self.m_liste[k]
-            etiket = ADLAR[k] + (" · sabah namazı" if k == "imsak" else "")
+            etiket = vakit_adi(k) + (t(" · sabah namazı") if k == "imsak" else "")
             if k == simdiki:
-                etiket += " · şu an"
+                etiket += t(" · şu an")
             metin = f"{etiket}\t{self._v[k]:%H:%M}"
             self._liste_yaz(item, metin, k == simdiki,
                             k == sonraki and zaman.date() == bugun,
@@ -622,35 +741,41 @@ class NamazApp(rumps.App):
         if self.notifier is None:
             return
         gun = now.date()
-        sehir = self.s["sehir"]
+        sehir = sehir_adi(self.s["sehir"])
         for i, k in enumerate(VAKITLER):
-            t = self._v[k]
-            ad = ADLAR[k]
+            vt = self._v[k]
+            ad = vakit_adi(k)
             once = self.s["once_dk"]
-            if once and t - dt.timedelta(minutes=once) <= now < t and \
+            if once and vt - dt.timedelta(minutes=once) <= now < vt and \
                     (gun, k, "once") not in self.gonderilen:
                 self.gonderilen.add((gun, k, "once"))
-                if (t - now).total_seconds() > 60:
+                if (vt - now).total_seconds() > 60:
                     if k == "gunes":
-                        baslik = f"Güneşin doğmasına {once} dakika"
-                        govde = f"Sabah namazının vakti {t:%H:%M}'de çıkıyor · {sehir}"
+                        baslik = t("Güneşin doğmasına {n} dakika", n=once)
+                        govde = t("Sabah namazının vakti {s} itibarıyla çıkıyor · {sehir}",
+                                  s=f"{vt:%H:%M}", sehir=sehir)
+                    elif k == "imsak":
+                        baslik = t("İmsak vaktine {n} dakika", n=once)
+                        govde = f"{sehir} · {vt:%H:%M}"
                     else:
-                        baslik = f"{ad} {'vaktine' if k == 'imsak' else 'ezanına'} {once} dakika"
-                        govde = f"{sehir} · {t:%H:%M}"
+                        baslik = t("{ad} ezanına {n} dakika", ad=ad, n=once)
+                        govde = f"{sehir} · {vt:%H:%M}"
                     self.notifier.send(baslik, govde, self.s["ses"])
                     log(f"bildirim: {baslik}")
             if self.s["vakitte_bildir"] and k != "gunes" and \
-                    t <= now < t + dt.timedelta(minutes=2) and \
+                    vt <= now < vt + dt.timedelta(minutes=2) and \
                     (gun, k, "vakit") not in self.gonderilen:
                 self.gonderilen.add((gun, k, "vakit"))
                 nk = VAKITLER[i + 1] if i + 1 < len(VAKITLER) else None
                 if nk == "gunes":
-                    govde = f"Güneş doğuşuna kadar · {self._v['gunes']:%H:%M}"
+                    govde = t("Güneş doğuşuna kadar · {s}", s=f"{self._v['gunes']:%H:%M}")
                 elif nk:
-                    govde = f"{ADLAR[nk]} vaktine kadar · {self._v[nk]:%H:%M}"
+                    govde = t("{ad} vaktine kadar · {s}", ad=vakit_adi(nk),
+                              s=f"{self._v[nk]:%H:%M}")
                 else:
-                    govde = f"İmsak vaktine kadar · {self._yarin['imsak']:%H:%M}"
-                self.notifier.send(f"{ad} vakti girdi", govde + " · Kılınca menüden işaretle",
+                    govde = t("İmsak vaktine kadar · {s}", s=f"{self._yarin['imsak']:%H:%M}")
+                self.notifier.send(t("{ad} vakti girdi", ad=ad),
+                                   govde + t(" · Kılınca menüden işaretle"),
                                    self.s["ses"])
                 log(f"bildirim: {ad} vakti girdi")
         # takip: kılınmadıysa vakit çıkmadan hatırlat (yatsı hariç: imsaka denk gelir)
@@ -664,8 +789,9 @@ class NamazApp(rumps.App):
                         (gun, k, "takip") not in self.gonderilen:
                     self.gonderilen.add((gun, k, "takip"))
                     kalan = kalan_metin((cikis - now).total_seconds())
-                    self.notifier.send(f"{NAMAZ_ADI[k]} namazının vakti çıkıyor",
-                                       f"{kalan} kaldı ({cikis:%H:%M}) · Kıldıysan menüden işaretle",
+                    self.notifier.send(t("{ad} namazının vakti çıkıyor", ad=namaz_adi(k)),
+                                       t("{kalan} kaldı ({s}) · Kıldıysan menüden işaretle",
+                                         kalan=kalan, s=f"{cikis:%H:%M}"),
                                        self.s["ses"])
                     log(f"bildirim: {NAMAZ_ADI[k]} vakti çıkıyor")
 
@@ -707,7 +833,7 @@ class NamazApp(rumps.App):
                     durumlar.append("kilindi" if ok else "yok")
                     toplam += 1
                     kilinan += 1 if ok else 0
-                etiket = "Bugün" if i == 0 else f"{GUN_KISA[g.weekday()]} {g.day}"
+                etiket = t("Bugün") if i == 0 else gun_kisa(g)
                 gunler.append((etiket, durumlar))
 
             W, H = 560, 290
@@ -718,17 +844,18 @@ class NamazApp(rumps.App):
                 p.setHidesOnDeactivate_(False)
                 p.setLevel_(3)
                 p.setCollectionBehavior_(1 | 256)
-                p.setTitle_("Namaz · Son 7 gün")
+                p.setTitle_(t("Namaz · Son 7 gün"))
                 self._panel = p
                 self._panel_acik = False
             p = self._panel
             icerik = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, W, H))
-            oran = f"%{round(100 * kilinan / toplam)}" if toplam else "—"
-            b1 = _etiket(f"{kilinan} / {toplam} vakit kılındı", boyut=20, kalin=True)
+            yuzde = round(100 * kilinan / toplam) if toplam else None
+            oran = (f"{yuzde}%" if en() else f"%{yuzde}") if toplam else "—"
+            b1 = _etiket(t("{a} / {b} vakit kılındı", a=kilinan, b=toplam), boyut=20, kalin=True)
             b1.setTextColor_(accent())
             b1.setFrame_(NSMakeRect(20, H - 44, 340, 26))
-            b2 = _etiket(f"Son 7 günde vakti giren namazların {oran}'i · "
-                         f"kılınmayan: {toplam - kilinan}", boyut=12, ikincil=True)
+            b2 = _etiket(t("Son 7 günde vakti giren namazların {oran}'i · kılınmayan: {n}",
+                           oran=oran, n=toplam - kilinan), boyut=12, ikincil=True)
             b2.setFrame_(NSMakeRect(20, H - 64, W - 40, 16))
             tv = TakipView.alloc().initWithFrame_(NSMakeRect(20, 20, W - 40, H - 92))
             tv.gunler, tv.renk = gunler, accent()
@@ -756,25 +883,27 @@ class NamazApp(rumps.App):
             self._degis("sehir", sehir)
         return cb
 
-    def yontem_sec(self, sender):
-        if sender.title.startswith("Ülkeye göre"):
-            self._degis("yontem", "oto")
-            return
-        kod = next((k for k, y in YONTEMLER.items() if y["ad"] == sender.title), "oto")
-        self._degis("yontem", kod)
+    def _yontem_cb(self, kod):
+        def cb(_):
+            self._degis("yontem", kod)
+        return cb
+
+    def _once_cb(self, dk):
+        def cb(_):
+            self._degis("once_dk", dk)
+        return cb
+
+    def _takip_cb(self, dk):
+        def cb(_):
+            if dk == 0:
+                self._degis("takip_hatirlat", False)
+            else:
+                self.s["takip_hatirlat"] = True
+                self._degis("takip_dk", dk)
+        return cb
 
     def hanefi_degistir(self, _):
         self._degis("hanefi", not self.hanefi())
-
-    def once_sec(self, sender):
-        self._degis("once_dk", 0 if sender.title == "Kapalı" else int(sender.title.split()[0]))
-
-    def takip_sec(self, sender):
-        if sender.title == "Kapalı":
-            self._degis("takip_hatirlat", False)
-        else:
-            self.s["takip_hatirlat"] = True
-            self._degis("takip_dk", int(sender.title.split()[0]))
 
     def vakitte_degistir(self, _):
         self._degis("vakitte_bildir", not self.s["vakitte_bildir"])
@@ -787,8 +916,17 @@ class NamazApp(rumps.App):
 
     def giris_degistir(self, _):
         if not set_agent(not agent_installed()):
-            rumps.alert("Namaz", "Bu seçenek uygulama Namaz.app olarak kurulduğunda çalışır.")
+            rumps.alert("Namaz", t("Bu seçenek uygulama Namaz.app olarak kurulduğunda çalışır."))
         self._isaretler()
+
+    def dil_sec(self, sender):
+        yeni = {"Türkçe": "tr", "English": "en"}.get(sender.title, "oto")
+        if yeni == self.s.get("dil", "oto"):
+            return
+        self.s["dil"] = yeni
+        save_settings(self.s)
+        log(f"dil değişti: {yeni}, yeniden başlatılıyor")
+        dil.yeniden_baslat(agent_installed())
 
     def cik(self, _):
         log("Namaz kapatıldı")

@@ -1,9 +1,12 @@
 # mac-araclari
 
-Mac menü çubuğu için üç küçük, Türkçe araç. Python ve macOS'un kendi arayüz
+Mac menü çubuğu için üç küçük araç (Türkçe / English). Python ve macOS'un kendi arayüz
 kütüphaneleriyle (PyObjC) yazıldı; her biri tek komutla `.app` olarak kurulur.
 
-*Three small macOS menu bar utilities with a Turkish UI — English summary below.*
+*Three small macOS menu bar utilities (Turkish / English UI) — English summary below.*
+
+> Uygulamalar Türkçe ve İngilizce; dili menüdeki **Dil / Language** seçeneğinden değiştirebilirsin (varsayılan: Mac'in dili).  
+> *Turkish and English UI — switch via **Dil / Language** in each app's menu (defaults to your Mac's language).*
 
 | | |
 |---|---|

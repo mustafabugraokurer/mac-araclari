@@ -21,7 +21,7 @@ OPTIONS = {
         "NSHumanReadableCopyright": "© 2026 Mustafa Buğra Okurer · MIT",
     },
     "packages": ["rumps"],
-    "includes": ["UserNotifications", "vakit", "sehirler", "zoneinfo"],
+    "includes": ["UserNotifications", "vakit", "sehirler", "zoneinfo", "dil"],
 }
 if os.path.exists("Namaz.icns"):
     OPTIONS["iconfile"] = "Namaz.icns"

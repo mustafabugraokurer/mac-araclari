@@ -21,7 +21,7 @@ OPTIONS = {
         "NSHumanReadableCopyright": "© 2026 Mustafa Buğra Okurer · MIT",
     },
     "packages": ["rumps"],
-    "includes": ["UserNotifications", "Quartz"],
+    "includes": ["UserNotifications", "Quartz", "dil"],
 }
 if os.path.exists("Denge.icns"):
     OPTIONS["iconfile"] = "Denge.icns"

@@ -25,6 +25,9 @@ from pathlib import Path
 
 import rumps
 
+from dil import t
+import dil
+
 try:  # macOS yerel arayüz parçaları (yoksa sade metin moduna düşer)
     from AppKit import (NSApplication, NSAttributedString, NSBezierPath,
                         NSBox, NSButton, NSColor, NSFont, NSFontAttributeName,
@@ -61,6 +64,7 @@ DEFAULTS = {
     "toplanti_sessiz": True,  # mikrofon açıkken uyarıları beklet
     "ses": True,
     "sadece_ikon": False,
+    "dil": "oto",           # "oto" (Mac'in diline göre) / "tr" / "en"
 }
 SURE_SECENEKLERI = [20, 30, 45, 60]
 MOLA_SECENEKLERI = [2, 3, 5]
@@ -78,7 +82,106 @@ SLEEP_GAP = 300      # bu kadar sn tick gelmezse Mac uyumuş say
 YAKIN = 5 * 60       # iki hatırlatma bu kadar yakınsa birleştir
 TOPLANTI_BEKLE = 60  # mikrofon açıkken kaç sn sonra tekrar bak
 TOPLANTI_EN_FAZLA = 60 * 60  # en fazla bu kadar beklet, sonra yine de uyar
-GUNLER = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
+# İngilizce karşılıklar (anahtar: Türkçe metin)
+CEVIRI = {
+    "Hatırlatma süresi · {dk} dk": "Remind after · {dk} min",
+    "Doğal mola sayılsın · {dk} dk boşta": "Count as a break · {dk} min idle",
+    "Mola süresi · {dk} dk": "Break length · {dk} min",
+    "Günlük hedef · {l} L": "Daily goal · {l} L",
+    "Bardak · {ml} ml": "Glass · {ml} ml",
+    "Hatırlatma aralığı · {dk} dk": "Remind every · {dk} min",
+    "Hareket ayarları · {dk} dk": "Movement settings · {dk} min",
+    "Bir bardak içtim ({ml} ml)": "I drank a glass ({ml} ml)",
+    "Bir bardak içtim": "I drank a glass",
+    "Haftalık istatistik": "Weekly stats",
+    "Hepsini duraklat": "Pause all",
+    "Kalktım, sıfırla": "I stood up, reset",
+    "Hareket ayarları": "Movement settings",
+    "Hatırlatma süresi": "Remind after",
+    "Mola süresi": "Break length",
+    "Doğal mola sayılsın": "Count as a break",
+    "Su ayarları": "Water settings",
+    "Su hatırlatıcısı": "Water reminder",
+    "Günlük hedef": "Daily goal",
+    "Bardak": "Glass",
+    "Hatırlatma aralığı": "Remind every",
+    "Son bardağı geri al": "Undo last glass",
+    "Mikrofon açıkken sessiz (toplantı)": "Quiet while mic is on (meetings)",
+    "Bildirim sesi": "Notification sound",
+    "Sadece ikon göster": "Show icon only",
+    "Oturum açınca başlat": "Open at login",
+    "Su ayarları · {l} L · {dk} dk": "Water settings · {l} L · {dk} min",
+    "Su ayarları · kapalı": "Water settings · off",
+    "Devam et": "Resume",
+    "Molayı bitir": "End break",
+    "Mola · bitince sayaç senin onayınla başlar": "Break · the timer restarts when you say so",
+    "Su hatırlatıcısı kapalı": "Water reminder is off",
+    "Hareket zamanı": "Time to move",
+    "{dk} dakikadır oturuyorsun. Kalk, biraz yürü ve esne.":
+        "You've been sitting for {dk} minutes. Stand up, walk around and stretch.",
+    "Su zamanı": "Time for water",
+    "Son bardaktan bu yana {dk} dakika geçti. Bugün {a} / {b} L içtin.":
+        "{dk} minutes since your last glass. Today: {a} / {b} L.",
+    "Kalk ve bir bardak su iç": "Stand up and drink a glass of water",
+    "{dk} dakikadır oturuyorsun ve su zamanı da geldi. Mutfağa kadar yürümek ikisini de çözer.":
+        "You've been sitting for {dk} minutes and it's time for water too. "
+        "A walk to the kitchen takes care of both.",
+    "Bugün": "Today",
+    "Mola bitti": "Break is over",
+    "Hazır olduğunda {dk} dakikalık sayacı başlat.":
+        "Start the {dk}-minute timer when you're ready.",
+    "Denge'den çık": "Quit Denge",
+    "Hareket": "Movement",
+    "Su": "Water",
+    "+ 1 bardak": "+ 1 glass",
+    "{dk} dk": "{dk} min",
+    "{dk} dk boşta": "{dk} min idle",
+    "{dk} dk mola": "{dk} min break",
+    "Her {dk} dk": "Every {dk} min",
+    "Bugünkü hedefe ulaştın": "You reached today's goal",
+    "Kalk": "Stand",
+    "Durdu": "Paused",
+    "Kalktım": "I stood up",
+    "{dk} dk ertele": "Snooze {dk} min",
+    "İçtim ({ml} ml)": "I drank ({ml} ml)",
+    "Bu sefer atla": "Skip this time",
+    "İkisini de yaptım": "Did both",
+    "Sadece kalktım": "Only stood up",
+    "Sadece su içtim": "Only drank water",
+    "Günlük su hedefi tamam": "Daily water goal reached",
+    "Bugün {l} L içtin. Bugünlük hatırlatma bitti.":
+        "You drank {l} L today. No more reminders today.",
+    "Denge · Son 7 gün ({g}.{a:02d} – bugün)": "Denge · Last 7 days ({g}/{a:02d} – today)",
+    "Toplam kalkış": "Total stand-ups",
+    "günde ortalama {o}": "{o} per day on average",
+    "İçilen su": "Water drunk",
+    "{n} gün hedefe ulaştın": "Goal reached on {n} days",
+    "En çok kalktığın gün": "Most active day",
+    "Günlük kalkış": "Daily stand-ups",
+    "Günlük su (L)": "Daily water (L)",
+    "Kesikli çizgi: {l} L hedef": "Dashed line: {l} L goal",
+    "Başlat": "Start",
+    "{dk} dk daha mola": "{dk} more min",
+    "Bu seçenek uygulama Denge.app olarak kurulduğunda çalışır. install.sh ile kurabilirsin.":
+        "This option works when the app is installed as Denge.app. Install it with install.sh.",
+    "Devam etmek için “Devam et”": "Choose “Resume” to continue",
+    "{dk} dakikadır oturuyorsun · Bugün {n} kez kalktın":
+        "Sitting for {dk} min · Stood up {n} times today",
+    "Kalkmaya {dk} dk · Bugün {n} kez kalktın": "Stand up in {dk} min · {n} times today",
+    "Duraklatıldı": "Paused",
+    "{n} kez": "{n} times",
+    "henüz veri yok": "no data yet",
+    "İstatistik açılamadı: {e}": "Couldn't open stats: {e}",
+    "Sonraki hatırlatma {dk} dk sonra": "Next reminder in {dk} min",
+    "Mola": "Break",
+}
+
+GUNLER_TR = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
+GUNLER_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def gun_adi(i: int) -> str:
+    return (GUNLER_EN if dil.kod() == "en" else GUNLER_TR)[i]
 
 
 # ---------------------------------------------------------------- yardımcılar
@@ -194,10 +297,15 @@ def mmss(seconds: float) -> str:
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
 
 
+def dakika(seconds: float) -> int:
+    """Kalan süre, dakikaya yukarı yuvarlanmış (0:45 → 1)."""
+    return max(0, int(-(-max(0, seconds) // 60)))
+
+
 def litre(ml: int) -> str:
     v = ml / 1000
     txt = f"{v:.2f}".rstrip("0").rstrip(".")
-    return txt.replace(".", ",")
+    return txt if dil.kod() == "en" else txt.replace(".", ",")
 
 
 def bundle_executable():
@@ -509,6 +617,7 @@ class DengeApp(rumps.App):
     def __init__(self):
         super().__init__("Denge", title="Denge", quit_button=None)
         self.s = load_settings()
+        dil.ayarla(self.s.get("dil", "oto"), CEVIRI)
         self.g = Gunluk()
         self.notifier = None
         self._activity = None
@@ -536,38 +645,38 @@ class DengeApp(rumps.App):
         # ---- menü
         self.m_ozet = rumps.MenuItem("Denge")
         self.m_detay = rumps.MenuItem("")
-        self.m_bardak = rumps.MenuItem("Bir bardak içtim", callback=self.bardak_menu, key="d")
-        self.m_istatistik = rumps.MenuItem("Haftalık istatistik", callback=self.istatistik_ac,
+        self.m_bardak = rumps.MenuItem(t("Bir bardak içtim"), callback=self.bardak_menu, key="d")
+        self.m_istatistik = rumps.MenuItem(t("Haftalık istatistik"), callback=self.istatistik_ac,
                                            key="i")
-        self.m_duraklat = rumps.MenuItem("Hepsini duraklat", callback=self.duraklat, key="p")
-        self.m_sifirla = rumps.MenuItem("Kalktım, sıfırla", callback=self.sifirla, key="r")
+        self.m_duraklat = rumps.MenuItem(t("Hepsini duraklat"), callback=self.duraklat, key="p")
+        self.m_sifirla = rumps.MenuItem(t("Kalktım, sıfırla"), callback=self.sifirla, key="r")
 
-        self.m_hareket = rumps.MenuItem("Hareket ayarları")
-        self.m_sure = rumps.MenuItem("Hatırlatma süresi")
+        self.m_hareket = rumps.MenuItem(t("Hareket ayarları"))
+        self.m_sure = rumps.MenuItem(t("Hatırlatma süresi"))
         for dk in SURE_SECENEKLERI:
-            self.m_sure.add(rumps.MenuItem(f"{dk} dk", callback=self.sure_sec))
-        self.m_kalkma = rumps.MenuItem("Mola süresi")
+            self.m_sure.add(rumps.MenuItem(t("{dk} dk", dk=dk), callback=self.sure_sec))
+        self.m_kalkma = rumps.MenuItem(t("Mola süresi"))
         for dk in KALKMA_SECENEKLERI:
-            self.m_kalkma.add(rumps.MenuItem(f"{dk} dk mola", callback=self.kalkma_sec))
-        self.m_mola = rumps.MenuItem("Doğal mola sayılsın")
+            self.m_kalkma.add(rumps.MenuItem(t("{dk} dk mola", dk=dk), callback=self.kalkma_sec))
+        self.m_mola = rumps.MenuItem(t("Doğal mola sayılsın"))
         for dk in MOLA_SECENEKLERI:
-            self.m_mola.add(rumps.MenuItem(f"{dk} dk boşta", callback=self.mola_sec))
+            self.m_mola.add(rumps.MenuItem(t("{dk} dk boşta", dk=dk), callback=self.mola_sec))
         self.m_hareket.add(self.m_sure)
         self.m_hareket.add(self.m_kalkma)
         self.m_hareket.add(self.m_mola)
 
-        self.m_su = rumps.MenuItem("Su ayarları")
-        self.m_su_acik = rumps.MenuItem("Su hatırlatıcısı", callback=self.su_ac_kapa)
-        self.m_hedef = rumps.MenuItem("Günlük hedef")
+        self.m_su = rumps.MenuItem(t("Su ayarları"))
+        self.m_su_acik = rumps.MenuItem(t("Su hatırlatıcısı"), callback=self.su_ac_kapa)
+        self.m_hedef = rumps.MenuItem(t("Günlük hedef"))
         for ml in HEDEF_SECENEKLERI:
             self.m_hedef.add(rumps.MenuItem(f"{litre(ml)} L", callback=self.hedef_sec))
-        self.m_bardak_boy = rumps.MenuItem("Bardak")
+        self.m_bardak_boy = rumps.MenuItem(t("Bardak"))
         for ml in BARDAK_SECENEKLERI:
             self.m_bardak_boy.add(rumps.MenuItem(f"{ml} ml", callback=self.bardak_sec))
-        self.m_aralik = rumps.MenuItem("Hatırlatma aralığı")
+        self.m_aralik = rumps.MenuItem(t("Hatırlatma aralığı"))
         for dk in ARALIK_SECENEKLERI:
-            self.m_aralik.add(rumps.MenuItem(f"Her {dk} dk", callback=self.aralik_sec))
-        self.m_geri = rumps.MenuItem("Son bardağı geri al", callback=self.bardak_geri)
+            self.m_aralik.add(rumps.MenuItem(t("Her {dk} dk", dk=dk), callback=self.aralik_sec))
+        self.m_geri = rumps.MenuItem(t("Son bardağı geri al"), callback=self.bardak_geri)
         self.m_su.add(self.m_su_acik)
         self.m_su.add(self.m_hedef)
         self.m_su.add(self.m_bardak_boy)
@@ -575,18 +684,21 @@ class DengeApp(rumps.App):
         self.m_su.add(None)
         self.m_su.add(self.m_geri)
 
-        self.m_toplanti = rumps.MenuItem("Mikrofon açıkken sessiz (toplantı)",
+        self.m_toplanti = rumps.MenuItem(t("Mikrofon açıkken sessiz (toplantı)"),
                                          callback=self.toplanti_degistir)
-        self.m_ses = rumps.MenuItem("Bildirim sesi", callback=self.ses_degistir)
-        self.m_ikon = rumps.MenuItem("Sadece ikon göster", callback=self.ikon_degistir)
-        self.m_giris = rumps.MenuItem("Oturum açınca başlat", callback=self.giris_degistir)
+        self.m_ses = rumps.MenuItem(t("Bildirim sesi"), callback=self.ses_degistir)
+        self.m_ikon = rumps.MenuItem(t("Sadece ikon göster"), callback=self.ikon_degistir)
+        self.m_giris = rumps.MenuItem(t("Oturum açınca başlat"), callback=self.giris_degistir)
+        self.m_dil = rumps.MenuItem("Dil / Language")
+        for ad in ("Sistem / System", "Türkçe", "English"):
+            self.m_dil.add(rumps.MenuItem(ad, callback=self.dil_sec))
 
         self.menu = [
             self.m_ozet, self.m_detay, self.m_bardak, None,
             self.m_istatistik, self.m_duraklat, self.m_sifirla, None,
             self.m_hareket, self.m_su, self.m_toplanti, self.m_ses, self.m_ikon, None,
-            self.m_giris, None,
-            rumps.MenuItem("Denge'den çık", callback=self.cik, key="q"),
+            self.m_giris, self.m_dil, None,
+            rumps.MenuItem(t("Denge'den çık"), callback=self.cik, key="q"),
         ]
         self._isaretleri_guncelle()
 
@@ -614,7 +726,7 @@ class DengeApp(rumps.App):
             W, H = 300, 156
             view = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, W, H))
             x, iw = 14, W - 28
-            h_ad = _etiket("Hareket", kalin=True)
+            h_ad = _etiket(t("Hareket"), kalin=True)
             h_ad.setFrame_(NSMakeRect(x, 134, 160, 17))
             h_deger = _etiket("30:00", kalin=True, sag=True, mono=True)
             h_deger.setFrame_(NSMakeRect(x + iw - 120, 134, 120, 17))
@@ -630,7 +742,7 @@ class DengeApp(rumps.App):
             ayrac = NSBox.alloc().initWithFrame_(NSMakeRect(x, 90, iw, 1))
             ayrac.setBoxType_(2)  # ayırıcı çizgi
 
-            s_ad = _etiket("Su", kalin=True)
+            s_ad = _etiket(t("Su"), kalin=True)
             s_ad.setFrame_(NSMakeRect(x, 64, 160, 17))
             s_deger = _etiket("0 / 2 L", kalin=True, sag=True, mono=True)
             s_deger.setFrame_(NSMakeRect(x + iw - 140, 64, 140, 17))
@@ -639,7 +751,7 @@ class DengeApp(rumps.App):
             s_alt = _etiket("", boyut=12, ikincil=True)
             s_alt.setFrame_(NSMakeRect(x, 10, iw - 96, 16))
             s_btn = NSButton.alloc().initWithFrame_(NSMakeRect(x + iw - 90, 5, 90, 26))
-            s_btn.setTitle_("+ 1 bardak")
+            s_btn.setTitle_(t("+ 1 bardak"))
             s_btn.setBezelStyle_(1)  # yuvarlak köşeli düğme
             s_btn.setControlSize_(1)
             try:
@@ -655,8 +767,8 @@ class DengeApp(rumps.App):
                 hi = sembol("figure.walk", 13, hareket_renk())
                 si = sembol("drop.fill", 12, su_renk())
                 if hi is not None:
-                    h_ad.setStringValue_("      Hareket")
-                    s_ad.setStringValue_("      Su")
+                    h_ad.setStringValue_("      " + t("Hareket"))
+                    s_ad.setStringValue_("      " + t("Su"))
                     from AppKit import NSImageView
                     for img, y in ((hi, 133), (si, 63)):
                         v = NSImageView.alloc().initWithFrame_(NSMakeRect(x, y, 18, 18))
@@ -716,34 +828,38 @@ class DengeApp(rumps.App):
     def _isaretleri_guncelle(self):
         s = self.s
         for item in self.m_sure.values():
-            item.state = item.title == f"{s['sure_dk']} dk"
+            item.state = item.title == t("{dk} dk", dk=s["sure_dk"])
         for item in self.m_mola.values():
-            item.state = item.title == f"{s['mola_dk']} dk boşta"
+            item.state = item.title == t("{dk} dk boşta", dk=s["mola_dk"])
         for item in self.m_kalkma.values():
-            item.state = item.title == f"{s['kalkma_dk']} dk mola"
+            item.state = item.title == t("{dk} dk mola", dk=s["kalkma_dk"])
         for item in self.m_hedef.values():
             item.state = item.title == f"{litre(s['su_hedef_ml'])} L"
         for item in self.m_bardak_boy.values():
             item.state = item.title == f"{s['bardak_ml']} ml"
         for item in self.m_aralik.values():
-            item.state = item.title == f"Her {s['su_aralik_dk']} dk"
-        self.m_sure.title = f"Hatırlatma süresi · {s['sure_dk']} dk"
-        self.m_mola.title = f"Doğal mola sayılsın · {s['mola_dk']} dk boşta"
-        self.m_kalkma.title = f"Mola süresi · {s['kalkma_dk']} dk"
-        self.m_hedef.title = f"Günlük hedef · {litre(s['su_hedef_ml'])} L"
-        self.m_bardak_boy.title = f"Bardak · {s['bardak_ml']} ml"
-        self.m_aralik.title = f"Hatırlatma aralığı · {s['su_aralik_dk']} dk"
-        self.m_hareket.title = f"Hareket ayarları · {s['sure_dk']} dk"
-        self.m_su.title = (f"Su ayarları · {litre(s['su_hedef_ml'])} L · {s['su_aralik_dk']} dk"
-                           if s["su_acik"] else "Su ayarları · kapalı")
+            item.state = item.title == t("Her {dk} dk", dk=s["su_aralik_dk"])
+        self.m_sure.title = t("Hatırlatma süresi · {dk} dk", dk=s["sure_dk"])
+        self.m_mola.title = t("Doğal mola sayılsın · {dk} dk boşta", dk=s["mola_dk"])
+        self.m_kalkma.title = t("Mola süresi · {dk} dk", dk=s["kalkma_dk"])
+        self.m_hedef.title = t("Günlük hedef · {l} L", l=litre(s["su_hedef_ml"]))
+        self.m_bardak_boy.title = t("Bardak · {ml} ml", ml=s["bardak_ml"])
+        self.m_aralik.title = t("Hatırlatma aralığı · {dk} dk", dk=s["su_aralik_dk"])
+        self.m_hareket.title = t("Hareket ayarları · {dk} dk", dk=s["sure_dk"])
+        self.m_su.title = (t("Su ayarları · {l} L · {dk} dk", l=litre(s["su_hedef_ml"]),
+                             dk=s["su_aralik_dk"])
+                           if s["su_acik"] else t("Su ayarları · kapalı"))
+        for item in self.m_dil.values():
+            item.state = item.title == {"tr": "Türkçe", "en": "English"}.get(
+                s.get("dil"), "Sistem / System")
         self.m_su_acik.state = bool(s["su_acik"])
         self.m_toplanti.state = bool(s["toplanti_sessiz"])
         self.m_ses.state = bool(s["ses"])
         self.m_ikon.state = bool(s["sadece_ikon"])
         self.m_giris.state = agent_installed()
-        self.m_duraklat.title = "Devam et" if self.duraklatildi else "Hepsini duraklat"
-        self.m_sifirla.title = "Molayı bitir" if self.mola_bitis else "Kalktım, sıfırla"
-        self.m_bardak.title = f"Bir bardak içtim ({s['bardak_ml']} ml)"
+        self.m_duraklat.title = t("Devam et") if self.duraklatildi else t("Hepsini duraklat")
+        self.m_sifirla.title = t("Molayı bitir") if self.mola_bitis else t("Kalktım, sıfırla")
+        self.m_bardak.title = t("Bir bardak içtim ({ml} ml)", ml=s["bardak_ml"])
 
     def _ekrani_guncelle(self):
         kalan = self.sonraki_uyari - self.oturma
@@ -754,30 +870,30 @@ class DengeApp(rumps.App):
 
         if d == "mola":
             h_deger = mmss(mola_kalan)
-            h_alt = "Mola · bitince sayaç senin onayınla başlar"
+            h_alt = t("Mola · bitince sayaç senin onayınla başlar")
             oran = 1.0 - mola_kalan / max(1, self.s["kalkma_dk"] * 60)
         elif d == "durdu":
-            h_deger, h_alt, oran = "Durdu", "Devam etmek için “Devam et”", 0.0
+            h_deger, h_alt, oran = t("Durdu"), t("Devam etmek için “Devam et”"), 0.0
         elif d == "kalk":
-            h_deger = "Kalk"
-            h_alt = f"{dk} dakikadır oturuyorsun · Bugün {kalkis} kez kalktın"
+            h_deger = t("Kalk")
+            h_alt = t("{dk} dakikadır oturuyorsun · Bugün {n} kez kalktın", dk=dk, n=kalkis)
             oran = 1.0
         else:
             h_deger = mmss(kalan)
-            h_alt = f"Kalkmaya {max(0, int(kalan // 60))} dk · Bugün {kalkis} kez kalktın"
+            h_alt = t("Kalkmaya {dk} dk · Bugün {n} kez kalktın", dk=max(0, int(kalan // 60)), n=kalkis)
             oran = self.oturma / max(1, self.limit)
 
         su_ml, hedef = self.g.su(), int(self.s["su_hedef_ml"])
         s_deger = f"{litre(su_ml)} / {litre(hedef)} L"
         if not self.s["su_acik"]:
-            s_alt = "Su hatırlatıcısı kapalı"
+            s_alt = t("Su hatırlatıcısı kapalı")
         elif su_ml >= hedef:
-            s_alt = "Bugünkü hedefe ulaştın"
+            s_alt = t("Bugünkü hedefe ulaştın")
         elif d == "durdu":
-            s_alt = "Duraklatıldı"
+            s_alt = t("Duraklatıldı")
         else:
             kalan_su = max(0, int((self.su_sonraki - self.su_gecen) // 60))
-            s_alt = f"Sonraki hatırlatma {kalan_su} dk sonra" if kalan_su else "Su zamanı"
+            s_alt = t("Sonraki hatırlatma {dk} dk sonra", dk=kalan_su) if kalan_su else t("Su zamanı")
 
         if self._header:
             hd = self._header
@@ -797,12 +913,15 @@ class DengeApp(rumps.App):
                 bv.dolu, bv.toplam = yeni
                 bv.setNeedsDisplay_(True)
         else:
-            self.m_ozet.title = f"Hareket  {h_deger}"
-            self.m_detay.title = f"Su  {s_deger}"
+            self.m_ozet.title = t("Hareket") + f"  {h_deger}"
+            self.m_detay.title = t("Su") + f"  {s_deger}"
 
         # menü çubuğu
-        metin = {"sayiyor": mmss(kalan), "kalk": "Kalk", "durdu": "Durdu",
-                 "mola": "Mola " + mmss(mola_kalan)}[d]
+        # Menü çubuğu dakikada bir değişir (her saniye çizmek işlemciyi yoruyor);
+        # saniyeli süre menü açılınca görünür.
+        metin = {"sayiyor": t("{dk} dk", dk=dakika(kalan)), "kalk": t("Kalk"),
+                 "durdu": t("Durdu"),
+                 "mola": t("Mola") + " " + t("{dk} dk", dk=dakika(mola_kalan))}[d]
         su_metin = None
         if self.s["su_acik"] and d != "durdu":
             su_metin = f"{self.bardak_dolu()}/{self.bardak_toplam()}"
@@ -865,7 +984,7 @@ class DengeApp(rumps.App):
             log(f"menü çubuğu çizilemedi: {e}")
             parca = [metin] if metin else []
             if su_metin:
-                parca.append(f"Su {su_metin}")
+                parca.append(t("Su") + f" {su_metin}")
             self.title = "  ".join(parca) or "Denge"
 
     # ------------------------------------------------ zamanlayıcı
@@ -990,9 +1109,9 @@ class DengeApp(rumps.App):
         dk = int(self.oturma // 60)
         self.uyarildi = True
         self._ekrani_guncelle()
-        secim = self._alert("Hareket zamanı",
-                            f"{dk} dakikadır oturuyorsun. Kalk, biraz yürü ve esne.",
-                            ["Kalktım", "5 dk ertele", "15 dk ertele"],
+        secim = self._alert(t("Hareket zamanı"),
+                            t("{dk} dakikadır oturuyorsun. Kalk, biraz yürü ve esne.", dk=dk),
+                            [t("Kalktım"), t("{dk} dk ertele", dk=5), t("{dk} dk ertele", dk=15)],
                             "figure.walk", hareket_renk())
         if secim == 0:
             self._kalkti(sayilsin=True, zorla=True)
@@ -1010,10 +1129,11 @@ class DengeApp(rumps.App):
         self._son_durum = None
         self._ekrani_guncelle()
         secim = self._alert(
-            "Su zamanı",
-            f"Son bardaktan bu yana {dk} dakika geçti. "
-            f"Bugün {litre(self.g.su())} / {litre(self.s['su_hedef_ml'])} L içtin.",
-            [f"İçtim ({self.s['bardak_ml']} ml)", "15 dk ertele", "Bu sefer atla"],
+            t("Su zamanı"),
+            t("Son bardaktan bu yana {dk} dakika geçti. Bugün {a} / {b} L içtin.",
+              dk=dk, a=litre(self.g.su()), b=litre(self.s["su_hedef_ml"])),
+            [t("İçtim ({ml} ml)", ml=self.s["bardak_ml"]), t("{dk} dk ertele", dk=15),
+             t("Bu sefer atla")],
             "drop.fill", su_renk())
         if secim == 0:
             self.bardak_ekle(kaynak="uyarı")
@@ -1031,10 +1151,11 @@ class DengeApp(rumps.App):
         self.uyarildi = True
         self._ekrani_guncelle()
         secim = self._alert(
-            "Kalk ve bir bardak su iç",
-            f"{dk} dakikadır oturuyorsun ve su zamanı da geldi. "
-            "Mutfağa kadar yürümek ikisini de çözer.",
-            ["İkisini de yaptım", "Sadece kalktım", "Sadece su içtim", "5 dk ertele"],
+            t("Kalk ve bir bardak su iç"),
+            t("{dk} dakikadır oturuyorsun ve su zamanı da geldi. "
+              "Mutfağa kadar yürümek ikisini de çözer.", dk=dk),
+            [t("İkisini de yaptım"), t("Sadece kalktım"), t("Sadece su içtim"),
+             t("{dk} dk ertele", dk=5)],
             "figure.walk", hareket_renk())
         if secim in (0, 1):
             self._kalkti(sayilsin=True, zorla=True)
@@ -1062,8 +1183,9 @@ class DengeApp(rumps.App):
         log(f"+{ml} ml ({kaynak}) · bugün {self.g.su()} ml")
         if self.g.su() >= int(self.s["su_hedef_ml"]) and \
                 self.g.su() - ml < int(self.s["su_hedef_ml"]) and self.notifier:
-            self.notifier.send("Günlük su hedefi tamam",
-                               f"Bugün {litre(self.g.su())} L içtin. Bugünlük hatırlatma bitti.",
+            self.notifier.send(t("Günlük su hedefi tamam"),
+                               t("Bugün {l} L içtin. Bugünlük hatırlatma bitti.",
+                                 l=litre(self.g.su())),
                                False)
         self._ekrani_guncelle()
 
@@ -1091,8 +1213,8 @@ class DengeApp(rumps.App):
             hedef = int(self.s["su_hedef_ml"])
             kalkislar = [k for _, k, _ in gunler]
             sular = [s for _, _, s in gunler]
-            etiketler = [GUNLER[t.weekday()] for t, _, _ in gunler]
-            etiketler[-1] = "Bugün"
+            etiketler = [gun_adi(g.weekday()) for g, _, _ in gunler]
+            etiketler[-1] = t("Bugün")
 
             W, H = 580, 470
             if self._istatistik is None:
@@ -1105,7 +1227,7 @@ class DengeApp(rumps.App):
                 self._istatistik = p
             p = self._istatistik
             bas = gunler[0][0]
-            p.setTitle_(f"Denge · Son 7 gün ({bas.day}.{bas.month:02d} – bugün)")
+            p.setTitle_(t("Denge · Son 7 gün ({g}.{a:02d} – bugün)", g=bas.day, a=bas.month))
             icerik = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, W, H))
 
             def kart(x, baslik, deger, alt, renk=None):
@@ -1122,25 +1244,26 @@ class DengeApp(rumps.App):
 
             toplam = sum(kalkislar)
             ort = toplam / 7
-            kart(20, "Toplam kalkış", str(toplam),
-                 f"günde ortalama {ort:.1f}".replace(".", ","), hareket_renk())
-            kart(210, "İçilen su", f"{litre(sum(sular))} L",
-                 f"{sum(1 for s in sular if s >= hedef)} gün hedefe ulaştın", su_renk())
+            ort_txt = f"{ort:.1f}" if dil.kod() == "en" else f"{ort:.1f}".replace(".", ",")
+            kart(20, t("Toplam kalkış"), str(toplam),
+                 t("günde ortalama {o}", o=ort_txt), hareket_renk())
+            kart(210, t("İçilen su"), f"{litre(sum(sular))} L",
+                 t("{n} gün hedefe ulaştın", n=sum(1 for s in sular if s >= hedef)), su_renk())
             en_iyi = max(range(7), key=lambda i: kalkislar[i])
-            kart(400, "En çok kalktığın gün",
+            kart(400, t("En çok kalktığın gün"),
                  etiketler[en_iyi] if kalkislar[en_iyi] else "—",
-                 f"{kalkislar[en_iyi]} kez" if kalkislar[en_iyi] else "henüz veri yok")
+                 t("{n} kez", n=kalkislar[en_iyi]) if kalkislar[en_iyi] else t("henüz veri yok"))
 
-            t1 = _etiket("Günlük kalkış", kalin=True)
+            t1 = _etiket(t("Günlük kalkış"), kalin=True)
             t1.setFrame_(NSMakeRect(20, H - 122, 300, 17))
             g1 = GrafikView.alloc().initWithFrame_(NSMakeRect(20, 196, W - 40, 140))
             g1.degerler, g1.etiketler, g1.renk = kalkislar, etiketler, hareket_renk()
             g1.yazilar = [str(k) for k in kalkislar]
             g1.hedef = None
 
-            t2 = _etiket("Günlük su (L)", kalin=True)
+            t2 = _etiket(t("Günlük su (L)"), kalin=True)
             t2.setFrame_(NSMakeRect(20, 164, 300, 17))
-            t2b = _etiket(f"Kesikli çizgi: {litre(hedef)} L hedef", boyut=12,
+            t2b = _etiket(t("Kesikli çizgi: {l} L hedef", l=litre(hedef)), boyut=12,
                           ikincil=True, sag=True)
             t2b.setFrame_(NSMakeRect(W - 240, 164, 220, 16))
             g2 = GrafikView.alloc().initWithFrame_(NSMakeRect(20, 20, W - 40, 136))
@@ -1156,7 +1279,7 @@ class DengeApp(rumps.App):
             p.makeKeyAndOrderFront_(None)
         except Exception as e:
             log(f"istatistik açılamadı: {e}")
-            rumps.alert("Denge", f"İstatistik açılamadı: {e}")
+            rumps.alert("Denge", t("İstatistik açılamadı: {e}", e=e))
 
     # ------------------------------------------------ menü eylemleri
     def duraklat(self, _):
@@ -1196,9 +1319,10 @@ class DengeApp(rumps.App):
         self.mola_bitis = time.monotonic()   # pencere açıkken 00:00'da bekler
         self._ekrani_guncelle()
         ek = self.s["kalkma_dk"]
-        secim = self._alert("Mola bitti",
-                            f"Hazır olduğunda {self.s['sure_dk']} dakikalık sayacı başlat.",
-                            ["Başlat", f"{ek} dk daha mola"], "chair", None)
+        secim = self._alert(t("Mola bitti"),
+                            t("Hazır olduğunda {dk} dakikalık sayacı başlat.",
+                              dk=self.s["sure_dk"]),
+                            [t("Başlat"), t("{dk} dk daha mola", dk=ek)], "chair", None)
         if secim == 1:
             self.mola_bitis = time.monotonic() + ek * 60
             log(f"mola {ek} dk uzatıldı")
@@ -1253,9 +1377,18 @@ class DengeApp(rumps.App):
     def giris_degistir(self, _):
         if not set_agent(not agent_installed()):
             rumps.alert("Denge",
-                        "Bu seçenek uygulama Denge.app olarak kurulduğunda çalışır. "
-                        "install.sh ile kurabilirsin.")
+                        t("Bu seçenek uygulama Denge.app olarak kurulduğunda çalışır. "
+                          "install.sh ile kurabilirsin."))
         self._isaretleri_guncelle()
+
+    def dil_sec(self, sender):
+        yeni = {"Türkçe": "tr", "English": "en"}.get(sender.title, "oto")
+        if yeni == self.s.get("dil", "oto"):
+            return
+        self.s["dil"] = yeni
+        self._kaydet()
+        log(f"dil değişti: {yeni}, yeniden başlatılıyor")
+        dil.yeniden_baslat(agent_installed())
 
     def cik(self, _):
         log("Denge kapatıldı")

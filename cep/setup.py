@@ -15,7 +15,7 @@ OPTIONS = {
         "LSMinimumSystemVersion": "12.0",
         "NSHumanReadableCopyright": "© 2026 Mustafa Buğra Okurer · MIT",
     },
-    "includes": ["store", "panel", "Vision"],
+    "includes": ["store", "panel", "Vision", "dil"],
     "packages": ["quickmachotkey"],
 }
 if os.path.exists("Cep.icns"):

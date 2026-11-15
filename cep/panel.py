@@ -20,6 +20,7 @@ from AppKit import (
 from Foundation import NSObject
 
 from store import Store
+from dil import t
 
 W = 380
 PAD = 12
@@ -239,7 +240,7 @@ class HistoryView(NSView):
             alt = Store.detail(oge)
             k = int(oge.get("kullanim", 0))
             if k >= 2:
-                alt += f" · {k} kez"
+                alt += t(" · {k} kez", k=k)
             yazi(alt, 11, 0, ikinci).drawInRect_(NSMakeRect(x0, y + 25, tw, 15))
 
             # sağ taraf
@@ -306,7 +307,7 @@ class PanelController(NSObject):
         p.setContentView_(fx)
 
         ara = NSSearchField.alloc().initWithFrame_(NSMakeRect(PAD, PAD, W - 2 * PAD - 36, 28))
-        ara.setPlaceholderString_("Ara")
+        ara.setPlaceholderString_(t("Ara"))
         ara.setDelegate_(self)
         ara.setFocusRingType_(1)
         kok.addSubview_(ara)
@@ -314,11 +315,11 @@ class PanelController(NSObject):
         dis = NSButton.buttonWithImage_target_action_(sembol("gearshape"), self, "ayarlar:")
         dis.setBordered_(False)
         dis.setFrame_(NSMakeRect(W - PAD - 30, PAD, 30, 28))
-        dis.setToolTip_("Ayarlar")
+        dis.setToolTip_(t("Ayarlar"))
         kok.addSubview_(dis)
 
         seg = NSSegmentedControl.segmentedControlWithLabels_trackingMode_target_action_(
-            ["Geçmiş", "Taşıma alanı"], 0, self, "sekmeDegisti:")
+            [t("Geçmiş"), t("Taşıma alanı")], 0, self, "sekmeDegisti:")
         seg.setFrame_(NSMakeRect(PAD, 48, W - 2 * PAD, 26))
         try:
             seg.setSegmentDistribution_(2)   # eşit genişlik
@@ -348,13 +349,13 @@ class PanelController(NSObject):
         sc2.setHidden_(True)
         kok.addSubview_(sc2)
 
-        bilgi = NSTextField.labelWithString_("Geçmiş 30 gün tutulur")
+        bilgi = NSTextField.labelWithString_(t("Geçmiş 30 gün tutulur"))
         bilgi.setFont_(NSFont.systemFontOfSize_(11))
         bilgi.setTextColor_(NSColor.secondaryLabelColor())
         kok.addSubview_(bilgi)
 
         temizle = NSButton.buttonWithTitle_target_action_(
-            "Sabitlenmemişleri temizle", self, "temizle:")
+            t("Sabitlenmemişleri temizle"), self, "temizle:")
         temizle.setBordered_(False)
         temizle.setFont_(NSFont.systemFontOfSize_(12))
         try:
@@ -443,11 +444,11 @@ class PanelController(NSObject):
         if sorgu:
             sonuc = st.search(sorgu)
             if sonuc:
-                baslik(f"Sonuçlar · {len(sonuc)}")
+                baslik(t("Sonuçlar · {n}", n=len(sonuc)))
                 for i, o in enumerate(sonuc[:200]):
                     oge(o, i + 1 if i < 9 else None)
             else:
-                satirlar.append({"tur": "bos", "metin": "Sonuç yok", "y": y, "h": 48})
+                satirlar.append({"tur": "bos", "metin": t("Sonuç yok"), "y": y, "h": 48})
                 y += 48
         else:
             pin = st.pinned()
@@ -456,18 +457,18 @@ class PanelController(NSObject):
             gecmis = [o for o in st.recent() if o["id"] not in sik_id]
             no = 1
             if pin:
-                baslik("Sabitlenenler · sen silene kadar kalır")
+                baslik(t("Sabitlenenler · sen silene kadar kalır"))
                 for o in pin:
                     oge(o, no if no <= 9 else None)
                     no += 1
             if sik:
-                baslik("Sık kullanılanlar")
+                baslik(t("Sık kullanılanlar"))
                 for o in sik:
                     oge(o, no if no <= 9 else None)
                     no += 1
-            baslik("Geçmiş" + (" · kayıt duraklatıldı" if self.app.ayar.get("duraklat") else ""))
+            baslik(t("Geçmiş") + (t(" · kayıt duraklatıldı") if self.app.ayar.get("duraklat") else ""))
             if not gecmis:
-                satirlar.append({"tur": "bos", "metin": "Henüz kopyalanan bir şey yok",
+                satirlar.append({"tur": "bos", "metin": t("Henüz kopyalanan bir şey yok"),
                                  "y": y, "h": 48})
                 y += 48
             for o in gecmis[:200]:
@@ -485,7 +486,7 @@ class PanelController(NSObject):
         if self.app is None:
             return
         n = len(self.app.store.shelf)
-        self.seg.setLabel_forSegment_(f"Taşıma alanı ({n})" if n else "Taşıma alanı", 1)
+        self.seg.setLabel_forSegment_(t("Taşıma alanı") + (f" ({n})" if n else ""), 1)
         if self.sekme == 0:
             onceki_id = None
             if not ilk and 0 <= self.secili < len(self.satirlar):
