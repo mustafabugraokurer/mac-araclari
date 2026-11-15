@@ -27,11 +27,12 @@ from sehirler import SEHIR_EN, ULKE_EN, ULKELER, sehir_bilgi
 from vakit import ADLAR, VAKITLER, YONTEMLER, vakitler
 
 try:
-    from AppKit import (NSApplication, NSAttributedString, NSBezierPath, NSColor, NSFont,
+    from AppKit import (NSApplication, NSAttributedString, NSBezierPath, NSButton, NSColor,
+                        NSFont,
                         NSFontAttributeName, NSForegroundColorAttributeName, NSImage,
                         NSImageSymbolConfiguration, NSMakeRect, NSPanel, NSTextField,
                         NSView)
-    from Foundation import NSBundle, NSMakePoint, NSProcessInfo, NSString
+    from Foundation import NSBundle, NSMakePoint, NSObject, NSProcessInfo, NSString
     HAS_APPKIT = True
 except Exception:  # pragma: no cover
     HAS_APPKIT = False
@@ -119,8 +120,6 @@ CEVIRI = {
     "{ad} ezanına": "Until {ad}",
     " · şu an": " · now",
     "{a} / {b} vakit kılındı": "{a} / {b} prayers done",
-    "Son 7 günde vakti giren namazların {oran}'i · kılınmayan: {n}":
-        "{oran} of the prayers due in the last 7 days · missed: {n}",
     "Bu seçenek uygulama Namaz.app olarak kurulduğunda çalışır.":
         "This option works when the app is installed as Namaz.app.",
     "{dk} dk önce": "{dk} min before",
@@ -130,7 +129,6 @@ CEVIRI = {
     "Güneş doğuşuna kadar · {s}": "Until sunrise · {s}",
     "{ad} vakti girdi": "It's time for {ad}",
     "Bugün": "Today",
-    "Namaz · Son 7 gün": "Namaz · Last 7 days",
     "Güneşin doğmasına {n} dakika": "{n} minutes until sunrise",
     "Sabah namazının vakti {s} itibarıyla çıkıyor · {sehir}": "Fajr time ends at {s} · {sehir}",
     "{ad} vaktine kadar · {s}": "Until {ad} · {s}",
@@ -141,6 +139,12 @@ CEVIRI = {
         "{kalan} left (until {s}) · Mark it in the menu if you prayed",
     "İmsak vaktine {n} dakika": "{n} minutes until Fajr",
     "{ad} ezanına {n} dakika": "{n} minutes until {ad}",
+    "Namaz takibi · {a} – {b}": "Prayer tracker · {a} – {b}",
+    "Bu hafta": "This week",
+    "Bu haftada vakti giren namazların {oran}'i · kılınmayan: {n}":
+        "{oran} of the prayers due this week · missed: {n}",
+    "Kıldığın ya da kaçırdığın vakti işaretlemek için daireye tıkla":
+        "Click a circle to mark a prayer as prayed or not",
 }
 
 
@@ -172,6 +176,12 @@ def tarih_metni(g):
     if en():
         return f"{GUNLER_EN[g.weekday()]}, {AYLAR_EN[g.month - 1]} {g.day}"
     return f"{g.day} {AYLAR[g.month - 1]} {GUNLER[g.weekday()]}"
+
+
+def kisa_tarih(g, yil=False):
+    if en():
+        return f"{AYLAR_EN[g.month - 1][:3]} {g.day}" + (f", {g.year}" if yil else "")
+    return f"{g.day} {AYLAR[g.month - 1]}" + (f" {g.year}" if yil else "")
 
 
 def gun_kisa(g):
@@ -349,21 +359,51 @@ class Takip:
 
 
 if HAS_APPKIT:
+    class Hedef(NSObject):
+        """NSButton için hedef: tıklanınca Python fonksiyonunu çağırır."""
+
+        def tikla_(self, sender):
+            fn = getattr(self, "fn", None)
+            if fn is not None:
+                try:
+                    fn()
+                except Exception as e:
+                    log(f"düğme hatası: {e}")
+
     class TakipView(NSView):
-        """7 gün × 5 vakit: dolu daire kılındı, boş daire kılınmadı, nokta: henüz değil."""
+        """7 gün × 5 vakit: dolu daire kılındı, boş daire kılınmadı, nokta: henüz değil.
+        Dairelere tıklayınca o günün o vakti işaretlenir / işaret kaldırılır."""
+
+        SOL, UST, SATIR = 70.0, 26.0, 30.0
 
         def isFlipped(self):
             return True
+
+        def acceptsFirstMouse_(self, event):
+            return True
+
+        def mouseDown_(self, event):
+            gunler = list(getattr(self, "gunler", []))
+            fn = getattr(self, "tikla", None)
+            if not gunler or fn is None:
+                return
+            pt = self.convertPoint_fromView_(event.locationInWindow(), None)
+            sutun = (self.bounds().size.width - self.SOL) / len(gunler)
+            i = int((pt.x - self.SOL) // sutun)
+            j = int((pt.y - self.UST) // self.SATIR)
+            if 0 <= i < len(gunler) and 0 <= j < len(NAMAZLAR) and pt.x >= self.SOL:
+                gun = gunler[i][2] if len(gunler[i]) > 2 else None
+                if gun is not None and gunler[i][1][j] != "gelecek":
+                    fn(gun, NAMAZLAR[j])
 
         def drawRect_(self, rect):
             gunler = list(getattr(self, "gunler", []))     # [(etiket, [durum x5])]
             renk = getattr(self, "renk", None) or NSColor.systemOrangeColor()
             if not gunler:
                 return
-            sol, ust = 70.0, 26.0
+            sol, ust, satir = self.SOL, self.UST, self.SATIR
             b = self.bounds()
             sutun = (b.size.width - sol) / len(gunler)
-            satir = 30.0
             kucuk = {NSFontAttributeName: NSFont.systemFontOfSize_(12),
                      NSForegroundColorAttributeName: NSColor.secondaryLabelColor()}
             normal = {NSFontAttributeName: NSFont.systemFontOfSize_(13),
@@ -371,7 +411,8 @@ if HAS_APPKIT:
             for j, k in enumerate(NAMAZLAR):
                 NSString.stringWithString_(namaz_adi(k)).drawAtPoint_withAttributes_(
                     NSMakePoint(0, ust + j * satir + 6), normal)
-            for i, (etiket, durumlar) in enumerate(gunler):
+            for i, gun_bilgi in enumerate(gunler):
+                etiket, durumlar = gun_bilgi[0], gun_bilgi[1]
                 x = sol + i * sutun + sutun / 2
                 s = NSString.stringWithString_(etiket)
                 sz = s.sizeWithAttributes_(kucuk)
@@ -433,7 +474,8 @@ class NamazApp(rumps.App):
                         for k in VAKITLER}
         self.m_liste["gunes"].set_callback(None)
         self.m_ipucu = rumps.MenuItem(t("Kıldığın vakte tıkla, işaretlensin"))
-        self.m_haftalik = rumps.MenuItem(t("Haftalık takip"), callback=self.haftalik_ac, key="t")
+        self.m_haftalik = rumps.MenuItem(t("Haftalık takip"), callback=self._haftalik_menu,
+                                         key="t")
 
         self.m_konum = rumps.MenuItem(t("Konum"))
         self._konum = []            # [(ülke, menü, {şehir: menü})]
@@ -819,24 +861,25 @@ class NamazApp(rumps.App):
         try:
             now = self.simdi()
             bugun = now.date()
+            ofset = getattr(self, "_hafta_ofset", 0)
+            pazartesi = bugun - dt.timedelta(days=bugun.weekday()) + dt.timedelta(weeks=ofset)
             gunler = []
             kilinan = toplam = 0
-            for i in range(6, -1, -1):
-                g = bugun - dt.timedelta(days=i)
+            for i in range(7):
+                g = pazartesi + dt.timedelta(days=i)
                 durumlar = []
-                v = self._v if i == 0 else None
                 for k in NAMAZLAR:
-                    if i == 0 and v[k] > now:
+                    if g > bugun or (g == bugun and self._v[k] > now):
                         durumlar.append("gelecek")
                         continue
                     ok = self.takip.kilindi_mi(g, k)
                     durumlar.append("kilindi" if ok else "yok")
                     toplam += 1
                     kilinan += 1 if ok else 0
-                etiket = t("Bugün") if i == 0 else gun_kisa(g)
-                gunler.append((etiket, durumlar))
+                etiket = t("Bugün") if g == bugun else gun_kisa(g)
+                gunler.append((etiket, durumlar, g))
 
-            W, H = 560, 290
+            W, H = 560, 320
             if self._panel is None:
                 p = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                     NSMakeRect(0, 0, W, H), 1 | 2, 2, False)
@@ -844,22 +887,48 @@ class NamazApp(rumps.App):
                 p.setHidesOnDeactivate_(False)
                 p.setLevel_(3)
                 p.setCollectionBehavior_(1 | 256)
-                p.setTitle_(t("Namaz · Son 7 gün"))
                 self._panel = p
-                self._panel_acik = False
             p = self._panel
+            pazar = pazartesi + dt.timedelta(days=6)
+            p.setTitle_(t("Namaz takibi · {a} – {b}", a=kisa_tarih(pazartesi),
+                          b=kisa_tarih(pazar, yil=True)))
             icerik = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, W, H))
+
+            # hafta gezinme: ‹  Bu hafta  ›
+            self._hedefler = []
+
+            def dugme(baslik, x, w, fn, etkin=True):
+                hd = Hedef.alloc().init()
+                hd.fn = fn
+                self._hedefler.append(hd)
+                b = NSButton.alloc().initWithFrame_(NSMakeRect(x, H - 42, w, 26))
+                b.setTitle_(baslik)
+                b.setBezelStyle_(1)
+                b.setTarget_(hd)
+                b.setAction_("tikla:")
+                b.setEnabled_(etkin)
+                icerik.addSubview_(b)
+
+            dugme("‹", W - 170, 36, lambda: self._hafta_git(-1))
+            dugme(t("Bu hafta"), W - 132, 90, lambda: self._hafta_git(0, mutlak=True),
+                  etkin=ofset != 0)
+            dugme("›", W - 40, 36, lambda: self._hafta_git(+1), etkin=ofset < 0)
+
             yuzde = round(100 * kilinan / toplam) if toplam else None
             oran = (f"{yuzde}%" if en() else f"%{yuzde}") if toplam else "—"
             b1 = _etiket(t("{a} / {b} vakit kılındı", a=kilinan, b=toplam), boyut=20, kalin=True)
             b1.setTextColor_(accent())
-            b1.setFrame_(NSMakeRect(20, H - 44, 340, 26))
-            b2 = _etiket(t("Son 7 günde vakti giren namazların {oran}'i · kılınmayan: {n}",
+            b1.setFrame_(NSMakeRect(20, H - 44, 330, 26))
+            b2 = _etiket(t("Bu haftada vakti giren namazların {oran}'i · kılınmayan: {n}",
                            oran=oran, n=toplam - kilinan), boyut=12, ikincil=True)
             b2.setFrame_(NSMakeRect(20, H - 64, W - 40, 16))
-            tv = TakipView.alloc().initWithFrame_(NSMakeRect(20, 20, W - 40, H - 92))
+            b3 = _etiket(t("Kıldığın ya da kaçırdığın vakti işaretlemek için daireye tıkla"),
+                         boyut=11, ikincil=True)
+            b3.setFrame_(NSMakeRect(20, 12, W - 40, 14))
+            tv = TakipView.alloc().initWithFrame_(NSMakeRect(20, 34, W - 40, H - 108))
             tv.gunler, tv.renk = gunler, accent()
-            for x in (b1, b2, tv):
+            tv.tikla = self._takip_tikla
+            for x in (b1, b2, b3, tv):
                 icerik.addSubview_(x)
             p.setContentView_(icerik)
             if not p.isVisible():
@@ -868,6 +937,21 @@ class NamazApp(rumps.App):
             p.makeKeyAndOrderFront_(None)
         except Exception as e:
             log(f"haftalık takip açılamadı: {e}")
+
+    def _hafta_git(self, adim, mutlak=False):
+        self._hafta_ofset = adim if mutlak else min(0, getattr(self, "_hafta_ofset", 0) + adim)
+        self.haftalik_ac(None)
+
+    def _haftalik_menu(self, _):
+        self._hafta_ofset = 0
+        self.haftalik_ac(None)
+
+    def _takip_tikla(self, gun, k):
+        """Haftalık tablodan işaretleme (geçmiş günler dahil)."""
+        durum = self.takip.degistir(gun, k)
+        log(f"takip (tablo): {gun} {NAMAZ_ADI[k]} {'kılındı' if durum else 'geri alındı'}")
+        self.tick(None)
+        self.haftalik_ac(None)
 
     # ---- menü eylemleri
     def _degis(self, k, v):
