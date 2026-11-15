@@ -15,6 +15,10 @@ kütüphaneleriyle (PyObjC) yazıldı; her biri tek komutla `.app` olarak kurulu
   <img src="docs/hareket-menu.png" width="49%" alt="Hareket menüsü">
   <img src="docs/cep-panel.png" width="49%" alt="Cep paneli">
 </p>
+<p align="center">
+  <img src="docs/hareket-uyari.png" width="49%" alt="Hareket uyarı ekranı">
+  <img src="docs/cep-tasima-birak.png" width="49%" alt="Cep taşıma alanı">
+</p>
 <p align="center"><sub>Tasarım görselleri — gerçek uygulamada küçük farklar olabilir.</sub></p>
 
 ## Kurulum
